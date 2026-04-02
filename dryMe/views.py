@@ -37,6 +37,13 @@ class RegisterView(APIView):
 # ===============================
 # 🔐 LOGIN
 # ===============================
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import AllowAny
+from django.contrib.auth import authenticate
+from rest_framework_simplejwt.tokens import RefreshToken
+
+
 class LoginView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
@@ -55,7 +62,8 @@ class LoginView(APIView):
         return Response({
             "access": str(refresh.access_token),
             "refresh": str(refresh),
-            "role": getattr(user, "role", "customer")
+            "role": getattr(user, "role", "customer"),  # ✅ ensures role always exists
+            "username": user.username                  # ✅ FIXED (closed properly)
         })
 
 
