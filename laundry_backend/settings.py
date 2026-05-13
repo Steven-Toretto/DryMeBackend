@@ -16,7 +16,9 @@ SECRET_KEY = 'django-insecure-xns&xq^j5-y8b=$2p!e+u*h0s0gqqyi7gxxyeo2*vr3)lb4iy8
 # DEBUG = True
 DEBUG = False
 
-ALLOWED_HOSTS = ["https://drymebackend-2.onrender.com/"]  # allow all hosts during development
+ALLOWED_HOSTS = [
+    "drymebackend-2.onrender.com",
+]  # allow all hosts during development
 
 # Application definition
 INSTALLED_APPS = [
