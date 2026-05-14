@@ -20,7 +20,7 @@ ALLOWED_HOSTS = [
     "drymebackend-2.onrender.com",
     "localhost",
     "127.0.0.1",
-    # ["*"]
+
 ]  # allow all hosts during development 
 
 # Application definition
@@ -49,7 +49,8 @@ MIDDLEWARE = [
 
 # CORS settings
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # React dev server
+    "http://localhost:5173",
+    "https://your-frontend.vercel.app",  
 ]
 CORS_ALLOW_ALL_ORIGINS = True  # convenient for dev, disable in production
 
