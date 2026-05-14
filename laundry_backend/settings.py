@@ -49,7 +49,7 @@ MIDDLEWARE = [
 
 # CORS settings
 CORS_ALLOWED_ORIGINS = [
-    "https://your-frontend.vercel.app",
+    "https://dry-me-frontend.vercel.app/",
     "http://localhost:5173",
       
 ]
