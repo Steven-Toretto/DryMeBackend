@@ -8,7 +8,7 @@ from django.utils.text import slugify
 
 
 # =============================
-# 🔐 Custom User
+#  Custom User
 # =============================
 class User(AbstractUser):
     ROLE_CHOICES = (
@@ -18,10 +18,10 @@ class User(AbstractUser):
 
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='customer')
 
-    # 📞 Phone (Kenya-friendly)
+    # Phone 
     phone = models.CharField(max_length=15, null=True, blank=True)
 
-    # 📍 Location
+    # Location
     location = models.CharField(max_length=255, null=True, blank=True)
 
     def __str__(self):
@@ -29,20 +29,20 @@ class User(AbstractUser):
 
 
 # =============================
-# 🖼️ Shop Image Upload (SAFE)
+#  Shop Image Upload (SAFE)
 # =============================
 def shop_image_upload(instance, filename):
     name, ext = os.path.splitext(filename)
     safe_name = slugify(name)
 
-    # ✅ prevent overwrite using UUID
+    #  prevent overwrite using UUID
     unique_name = f"{safe_name}-{uuid.uuid4().hex[:6]}"
 
     return f"shops/{unique_name}{ext}"
 
 
 # =============================
-# 🏪 Shop Model
+#  Shop Model
 # =============================
 class Shop(models.Model):
     owner = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -56,7 +56,7 @@ class Shop(models.Model):
 
 
 # =============================
-# 🧺 Service Model
+#  Service Model
 # =============================
 class Service(models.Model):
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="services")
@@ -68,7 +68,7 @@ class Service(models.Model):
 
 
 # =============================
-# 📦 Order Model
+#  Order Model
 # =============================
 class Order(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="orders")
@@ -77,14 +77,14 @@ class Order(models.Model):
 
     weight = models.DecimalField(max_digits=5, decimal_places=2)
 
-    # 💰 Money field
+    #  Money field
     total_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
 
-    # 📞 Snapshot customer details
+    #  Snapshot customer details
     customer_phone = models.CharField(max_length=15, blank=True, null=True)
     customer_location = models.CharField(max_length=255, blank=True, null=True)
 
-    # 💳 Payment
+    #  Payment
     payment_status = models.CharField(max_length=20, default="pending")
 
     STATUS_CHOICES = (
@@ -98,11 +98,11 @@ class Order(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
-        # ✅ Calculate total price safely
+        #  Calculate total price safely
         if self.service and self.weight:
             self.total_price = Decimal(self.service.price_per_kg) * Decimal(self.weight)
 
-        # ✅ Snapshot user details
+        #  Snapshot user details
         if self.user:
             self.customer_phone = self.user.phone
             self.customer_location = self.user.location
@@ -124,62 +124,4 @@ class Order(models.Model):
 
 
 
-
-# import os
-# from django.db import models
-# from django.contrib.auth.models import AbstractUser
-# from django.utils.text import slugify
-# from django.contrib.auth.models import User
-# from decimal import Decimal
-# from datetime import timedelta
-# from django.utils.timezone import now
-
-
-# #  Custom User
-
-# class User(AbstractUser):
-#     ROLE_CHOICES = (
-#         ('customer', 'Customer'),
-#         ('owner', 'Owner'),
-#     )
-
-#     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='customer')
-
-#     # ✅ PHONE (improved length for Kenya format)
-#     phone = models.CharField(max_length=15, null=True, blank=True)
-
-#     # ✅ NEW: LOCATION FIELD
-#     location = models.CharField(max_length=255, null=True, blank=True)
-
-#     def __str__(self):
-#         return self.username
-
-
-# # ✅ Custom upload function for shop images
-# def shop_image_upload(instance, filename):
-#     name, ext = os.path.splitext(filename)
-#     safe_name = slugify(name)  # replaces spaces and symbols with hyphens
-#     return f"shops/{safe_name}{ext}"
-
-
-# #  Shop model
-# class Shop(models.Model):
-#     owner = models.ForeignKey(User, on_delete=models.CASCADE)
-#     name = models.CharField(max_length=255)
-#     location = models.CharField(max_length=255)
-#     description = models.TextField()
-#     image = models.ImageField(upload_to=shop_image_upload, null=True, blank=True)
-
-#     def __str__(self):
-#         return self.name
-
-
-# #  Service model
-# class Service(models.Model):
-#     shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="services")
-#     name = models.CharField(max_length=100)
-#     price_per_kg = models.DecimalField(max_digits=6, decimal_places=2)
-
-#     def __str__(self):
-#         return f"{self.name} - {self.shop.name}"
 
