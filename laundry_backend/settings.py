@@ -49,8 +49,9 @@ MIDDLEWARE = [
 
 # CORS settings
 CORS_ALLOWED_ORIGINS = [
+    "https://your-frontend.vercel.app",
     "http://localhost:5173",
-    "https://your-frontend.vercel.app",  
+      
 ]
 # CORS_ALLOW_ALL_ORIGINS = True  # convenient for dev, disable in production
 CORS_ALLOW_ALL_ORIGINS = False
