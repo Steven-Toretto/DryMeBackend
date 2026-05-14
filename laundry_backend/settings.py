@@ -13,12 +13,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-xns&xq^j5-y8b=$2p!e+u*h0s0gqqyi7gxxyeo2*vr3)lb4iy8'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-# DEBUG = False
+# DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = [
     "drymebackend-2.onrender.com",
-]  # allow all hosts during development
+    "localhost",
+    "127.0.0.1",
+    # ["*"]
+]  # allow all hosts during development 
 
 # Application definition
 INSTALLED_APPS = [
