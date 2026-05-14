@@ -52,7 +52,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "https://your-frontend.vercel.app",  
 ]
-CORS_ALLOW_ALL_ORIGINS = True  # convenient for dev, disable in production
+# CORS_ALLOW_ALL_ORIGINS = True  # convenient for dev, disable in production
+CORS_ALLOW_ALL_ORIGINS = False
 
 ROOT_URLCONF = 'laundry_backend.urls'
 
