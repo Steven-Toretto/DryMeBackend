@@ -17,7 +17,7 @@ SECRET_KEY = 'django-insecure-xns&xq^j5-y8b=$2p!e+u*h0s0gqqyi7gxxyeo2*vr3)lb4iy8
 DEBUG = False
 
 ALLOWED_HOSTS = [
-    "drymebackend-2.onrender.com",
+    "https://drymebackend-2.onrender.com/",
     "localhost",
     "127.0.0.1",
 
