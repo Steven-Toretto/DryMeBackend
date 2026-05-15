@@ -126,11 +126,18 @@ WSGI_APPLICATION = "laundry_backend.wsgi.application"
 # ===============================
 # DATABASE
 # ===============================
+
 DATABASES = {
     "default": dj_database_url.config(
-        default=os.environ.get("DATABASE_URL")
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}"
     )
 }
+
+# DATABASES = {
+#     "default": dj_database_url.config(
+#         default=os.environ.get("DATABASE_URL")
+#     )
+# }
 
 # ===============================
 # PASSWORD VALIDATION
