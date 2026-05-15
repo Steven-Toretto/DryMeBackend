@@ -41,12 +41,50 @@ class UserSerializer(serializers.ModelSerializer):
 # ===============================
 # 🏪 Shop Serializer
 # ===============================
+
 class ShopSerializer(serializers.ModelSerializer):
-    owner = serializers.ReadOnlyField(source='owner.username')
+
+    owner = serializers.ReadOnlyField(
+        source='owner.username'
+    )
+
+    image = serializers.SerializerMethodField()
 
     class Meta:
         model = Shop
-        fields = ('id', 'owner', 'name', 'location', 'description', 'image')
+        fields = (
+            'id',
+            'owner',
+            'name',
+            'location',
+            'description',
+            'image',
+        )
+
+    def get_image(self, obj):
+
+        request = self.context.get("request")
+
+        if obj.image:
+
+            if request:
+                return request.build_absolute_uri(
+                    obj.image.url
+                )
+
+            return obj.image.url
+
+        return None
+
+# # ===============================
+# # 🏪 Shop Serializer
+# # ===============================
+# class ShopSerializer(serializers.ModelSerializer):
+#     owner = serializers.ReadOnlyField(source='owner.username')
+
+#     class Meta:
+#         model = Shop
+#         fields = ('id', 'owner', 'name', 'location', 'description', 'image')
 
 
 # ===============================

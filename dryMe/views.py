@@ -67,14 +67,13 @@ class LoginView(APIView):
         })
 
 
-# ===============================
-# 🏪 SHOPS (LIST + CREATE)
-# ===============================
 class ShopListCreateView(generics.ListCreateAPIView):
+
     serializer_class = ShopSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+
         user = self.request.user
 
         if user.role == "owner":
@@ -82,33 +81,98 @@ class ShopListCreateView(generics.ListCreateAPIView):
 
         return Shop.objects.all()
 
+    def get_serializer_context(self):
+
+        context = super().get_serializer_context()
+
+        context["request"] = self.request
+
+        return context
+
     def perform_create(self, serializer):
+
         serializer.save(owner=self.request.user)
 
+# # ===============================
+# # 🏪 SHOPS (LIST + CREATE)
+# # ===============================
+# class ShopListCreateView(generics.ListCreateAPIView):
+#     serializer_class = ShopSerializer
+#     permission_classes = [IsAuthenticated]
 
-# ===============================
-# ✏️ DELETE + UPDATE SHOP (OWNER ONLY)
-# ===============================
+#     def get_queryset(self):
+#         user = self.request.user
+
+#         if user.role == "owner":
+#             return Shop.objects.filter(owner=user)
+
+#         return Shop.objects.all()
+
+#     def perform_create(self, serializer):
+#         serializer.save(owner=self.request.user)
+
+
 class ShopDetailView(generics.RetrieveUpdateDestroyAPIView):
+
     serializer_class = ShopSerializer
     permission_classes = [IsAuthenticated]
     queryset = Shop.objects.all()
 
+    def get_serializer_context(self):
+
+        context = super().get_serializer_context()
+
+        context["request"] = self.request
+
+        return context
+
     def update(self, request, *args, **kwargs):
+
         shop = self.get_object()
 
         if shop.owner != request.user:
-            return Response({"error": "Not allowed"}, status=403)
+            return Response(
+                {"error": "Not allowed"},
+                status=403
+            )
 
         return super().update(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
+
         shop = self.get_object()
 
         if shop.owner != request.user:
-            return Response({"error": "Not allowed"}, status=403)
+            return Response(
+                {"error": "Not allowed"},
+                status=403
+            )
 
         return super().destroy(request, *args, **kwargs)
+
+# # ===============================
+# # ✏️ DELETE + UPDATE SHOP (OWNER ONLY)
+# # ===============================
+# class ShopDetailView(generics.RetrieveUpdateDestroyAPIView):
+#     serializer_class = ShopSerializer
+#     permission_classes = [IsAuthenticated]
+#     queryset = Shop.objects.all()
+
+#     def update(self, request, *args, **kwargs):
+#         shop = self.get_object()
+
+#         if shop.owner != request.user:
+#             return Response({"error": "Not allowed"}, status=403)
+
+#         return super().update(request, *args, **kwargs)
+
+#     def destroy(self, request, *args, **kwargs):
+#         shop = self.get_object()
+
+#         if shop.owner != request.user:
+#             return Response({"error": "Not allowed"}, status=403)
+
+#         return super().destroy(request, *args, **kwargs)
 
 
 # ===============================
@@ -130,7 +194,7 @@ def featured_shops(request):
         if len(unique_shops) == 4:
             break
 
-    serializer = ShopSerializer(unique_shops, many=True)
+    serializer = ShopSerializer(unique_shops, many=True, context={"request": request})
     return Response(serializer.data)
 
 
