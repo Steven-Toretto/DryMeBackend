@@ -61,16 +61,20 @@ class ShopSerializer(serializers.ModelSerializer):
             'image',
         )
 
-def get_image(self, obj):
-    request = self.context.get("request")
+    def get_image(self, obj):
 
-    if obj.image:
-        if request:
-            url = request.build_absolute_uri(obj.image.url)
-            return url.replace("http://", "https://")
-        return obj.image.url
+        request = self.context.get("request")
 
-    return None
+        if obj.image:
+
+            if request:
+                return request.build_absolute_uri(
+                    obj.image.url
+                )
+
+            return obj.image.url
+
+        return None
 
 # # ===============================
 # # 🏪 Shop Serializer
