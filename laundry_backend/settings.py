@@ -61,6 +61,10 @@ CSRF_TRUSTED_ORIGINS = [
     "https://dry-me-frontend.vercel.app",
 ]
 
+# Proxy settings for secure deployment
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+
 ROOT_URLCONF = 'laundry_backend.urls'
 
 TEMPLATES = [
