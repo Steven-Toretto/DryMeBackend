@@ -1,12 +1,11 @@
-from rest_framework import generics, permissions, status
+from rest_framework import generics, permissions
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
+from rest_framework_simplejwt.tokens import RefreshToken
 import random
-
-from rest_framework.decorators import api_view
 
 from .models import Order, Shop, Service
 from .serializers import (
@@ -60,7 +59,7 @@ class LoginView(APIView):
 
 
 # ===============================
-# 🏪 SHOPS
+# 🏪 SHOPS (LIST + CREATE)
 # ===============================
 class ShopListCreateView(generics.ListCreateAPIView):
     serializer_class = ShopSerializer
@@ -69,7 +68,8 @@ class ShopListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         user = self.request.user
 
-        if not user.is_authenticated:
+        # FIX: prevent AnonymousUser crash
+        if not user or not user.is_authenticated:
             return Shop.objects.none()
 
         role = getattr(user, "role", "customer")
@@ -80,9 +80,7 @@ class ShopListCreateView(generics.ListCreateAPIView):
         return Shop.objects.all()
 
     def get_serializer_context(self):
-        context = super().get_serializer_context()
-        context["request"] = self.request
-        return context
+        return {"request": self.request}
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
@@ -97,9 +95,7 @@ class ShopDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Shop.objects.all()
 
     def get_serializer_context(self):
-        context = super().get_serializer_context()
-        context["request"] = self.request
-        return context
+        return {"request": self.request}
 
     def update(self, request, *args, **kwargs):
         shop = self.get_object()
@@ -138,7 +134,11 @@ def featured_shops(request):
         if len(unique_shops) == 4:
             break
 
-    serializer = ShopSerializer(unique_shops, many=True, context={"request": request})
+    serializer = ShopSerializer(
+        unique_shops,
+        many=True,
+        context={"request": request}
+    )
     return Response(serializer.data)
 
 
@@ -174,7 +174,7 @@ class ServiceListCreateView(generics.ListCreateAPIView):
 
 
 # ===============================
-# 📦 ORDERS
+# 📦 ORDERS (CUSTOMER)
 # ===============================
 class OrderListCreateView(generics.ListCreateAPIView):
     serializer_class = OrderSerializer
