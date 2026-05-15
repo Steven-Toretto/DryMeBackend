@@ -71,10 +71,7 @@ class ShopSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
 
         if obj.image:
-            try:
-                return request.build_absolute_uri(obj.image.url)
-            except:
-                return None
+            return request.build_absolute_uri(obj.image.url)
 
         return None
 
