@@ -208,7 +208,7 @@ USE_TZ = True
 # ===============================
 # DEFAULT PRIMARY KEY
 # ===============================
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField" 
 
 
 
