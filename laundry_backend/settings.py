@@ -44,6 +44,9 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     "corsheaders",
 
+    'cloudinary',
+    'cloudinary_storage',
+
     # local apps
     "dryMe",
 ]
@@ -180,6 +183,13 @@ SIMPLE_JWT = {
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+# 
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': os.environ.get('CLOUDINARY_CLOUD_NAME'),
+    'API_KEY': os.environ.get('CLOUDINARY_API_KEY'),
+    'API_SECRET': os.environ.get('CLOUDINARY_API_SECRET'),
+}
+
 # ===============================
 # STATIC FILES
 # ===============================
@@ -193,7 +203,9 @@ STATICFILES_STORAGE = (
 # ===============================
 # DEFAULT FILE STORAGE
 # ===============================
-DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
+
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+# DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
 
 # ===============================
 # INTERNATIONALIZATION
