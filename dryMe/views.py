@@ -61,6 +61,7 @@ class LoginView(APIView):
 # ===============================
 # 🏪 SHOPS (LIST + CREATE)
 # ===============================
+
 class ShopListCreateView(generics.ListCreateAPIView):
     serializer_class = ShopSerializer
     permission_classes = [IsAuthenticated]
@@ -68,10 +69,11 @@ class ShopListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         user = self.request.user
 
-        # FIX: prevent AnonymousUser crash
+        # 🔥 HARD SAFETY CHECK (prevents 500 on Render)
         if not user or not user.is_authenticated:
             return Shop.objects.none()
 
+        # safe role access
         role = getattr(user, "role", "customer")
 
         if role == "owner":
@@ -84,6 +86,30 @@ class ShopListCreateView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
+
+# class ShopListCreateView(generics.ListCreateAPIView):
+#     serializer_class = ShopSerializer
+#     permission_classes = [IsAuthenticated]
+
+#     def get_queryset(self):
+#         user = self.request.user
+
+#         # FIX: prevent AnonymousUser crash
+#         if not user or not user.is_authenticated:
+#             return Shop.objects.none()
+
+#         role = getattr(user, "role", "customer")
+
+#         if role == "owner":
+#             return Shop.objects.filter(owner=user)
+
+#         return Shop.objects.all()
+
+#     def get_serializer_context(self):
+#         return {"request": self.request}
+
+#     def perform_create(self, serializer):
+#         serializer.save(owner=self.request.user)
 
 
 # ===============================
