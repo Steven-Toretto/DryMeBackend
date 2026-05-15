@@ -137,7 +137,8 @@ SIMPLE_JWT = {
 # }
 
 # Media files
-MEDIA_URL = '/media/'
+# MEDIA_URL = '/media/'
+MEDIA_URL = 'https://drymebackend-2.onrender.com/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # Static files

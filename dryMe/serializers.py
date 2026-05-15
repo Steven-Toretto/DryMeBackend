@@ -42,12 +42,18 @@ class UserSerializer(serializers.ModelSerializer):
 # 🏪 Shop Serializer
 # ===============================
 
+from rest_framework import serializers
+from .models import Shop, Service, Order
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+
+# ===============================
+# 🏪 SHOP SERIALIZER
+# ===============================
 class ShopSerializer(serializers.ModelSerializer):
-
-    owner = serializers.ReadOnlyField(
-        source='owner.username'
-    )
-
+    owner = serializers.ReadOnlyField(source='owner.username')
     image = serializers.SerializerMethodField()
 
     class Meta:
@@ -58,19 +64,50 @@ class ShopSerializer(serializers.ModelSerializer):
             'name',
             'location',
             'description',
-            'image',
+            'image'
         )
 
-def get_image(self, obj):
-    request = self.context.get("request")
+    def get_image(self, obj):
+        request = self.context.get("request")
 
-    if obj.image:
-        if request:
-            url = request.build_absolute_uri(obj.image.url)
-            return url.replace("http://", "https://")
-        return obj.image.url
+        if obj.image:
+            try:
+                return request.build_absolute_uri(obj.image.url)
+            except:
+                return None
 
-    return None
+        return None
+
+
+# class ShopSerializer(serializers.ModelSerializer):
+
+#     owner = serializers.ReadOnlyField(
+#         source='owner.username'
+#     )
+
+#     image = serializers.SerializerMethodField()
+
+#     class Meta:
+#         model = Shop
+#         fields = (
+#             'id',
+#             'owner',
+#             'name',
+#             'location',
+#             'description',
+#             'image',
+#         )
+
+# def get_image(self, obj):
+#     request = self.context.get("request")
+
+#     if obj.image:
+#         if request:
+#             url = request.build_absolute_uri(obj.image.url)
+#             return url.replace("http://", "https://")
+#         return obj.image.url
+
+#     return None
 
     # def get_image(self, obj):
 
