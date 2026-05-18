@@ -151,23 +151,73 @@ class ShopListCreateView(generics.ListCreateAPIView):
 # ===============================
 # 🏪 SHOP DETAIL
 # ===============================
+
 class ShopDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     serializer_class = ShopSerializer
     permission_classes = [IsAuthenticated]
     queryset = Shop.objects.all()
 
-    # IMPORTANT FOR IMAGE UPDATE
-    parser_classes = (
+    # IMPORTANT
+    parser_classes = [
         parsers.MultiPartParser,
         parsers.FormParser,
-    )
+    ]
 
     def get_serializer_context(self):
-
         return {
             "request": self.request
         }
+
+    def update(self, request, *args, **kwargs):
+
+        shop = self.get_object()
+
+        if shop.owner != request.user:
+            return Response(
+                {"error": "Not allowed"},
+                status=403
+            )
+
+        return super().update(
+            request,
+            *args,
+            **kwargs
+        )
+
+    def destroy(self, request, *args, **kwargs):
+
+        shop = self.get_object()
+
+        if shop.owner != request.user:
+            return Response(
+                {"error": "Not allowed"},
+                status=403
+            )
+
+        return super().destroy(
+            request,
+            *args,
+            **kwargs
+        )
+
+# class ShopDetailView(generics.RetrieveUpdateDestroyAPIView):
+
+#     serializer_class = ShopSerializer
+#     permission_classes = [IsAuthenticated]
+#     queryset = Shop.objects.all()
+
+#     # IMPORTANT FOR IMAGE UPDATE
+#     parser_classes = (
+#         parsers.MultiPartParser,
+#         parsers.FormParser,
+#     )
+
+#     def get_serializer_context(self):
+
+#         return {
+#             "request": self.request
+#         }
 
     # =========================
     # UPDATE SHOP
