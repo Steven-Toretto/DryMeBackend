@@ -196,6 +196,11 @@ class Order(models.Model):
         default="pending",
     )
 
+    # 📁 ARCHIVE
+    archived = models.BooleanField(
+        default=False
+    )
+
     created_at = models.DateTimeField(
         auto_now_add=True
     )
@@ -235,6 +240,7 @@ class Order(models.Model):
 
 
 
+
 # import os
 # import uuid
 # from decimal import Decimal
@@ -263,15 +269,15 @@ class Order(models.Model):
 #     # 📞 Phone
 #     phone = models.CharField(
 #         max_length=15,
-#         null=True,
 #         blank=True,
+#         null=True,
 #     )
 
 #     # 📍 Location
 #     location = models.CharField(
 #         max_length=255,
-#         null=True,
 #         blank=True,
+#         null=True,
 #     )
 
 #     def __str__(self):
@@ -283,13 +289,15 @@ class Order(models.Model):
 # # =============================
 # def shop_image_upload(instance, filename):
 
+#     # split filename safely
 #     name, ext = os.path.splitext(filename)
 
+#     # slugify filename
 #     safe_name = slugify(name)
 
-#     # prevent overwrite
+#     # unique image name
 #     unique_name = (
-#         f"{safe_name}-{uuid.uuid4().hex[:6]}"
+#         f"{safe_name}-{uuid.uuid4().hex[:8]}"
 #     )
 
 #     return f"shops/{unique_name}{ext}"
@@ -316,7 +324,7 @@ class Order(models.Model):
 
 #     description = models.TextField()
 
-#     # ✅ FIXED IMAGE FIELD
+#     # ✅ IMAGE FIELD
 #     image = models.ImageField(
 #         upload_to=shop_image_upload,
 #         blank=True,
@@ -326,6 +334,9 @@ class Order(models.Model):
 #     created_at = models.DateTimeField(
 #         auto_now_add=True
 #     )
+
+#     class Meta:
+#         ordering = ["-created_at"]
 
 #     def __str__(self):
 #         return self.name
@@ -347,7 +358,7 @@ class Order(models.Model):
 #     )
 
 #     price_per_kg = models.DecimalField(
-#         max_digits=6,
+#         max_digits=10,
 #         decimal_places=2,
 #     )
 
@@ -393,7 +404,7 @@ class Order(models.Model):
 #         decimal_places=2,
 #     )
 
-#     # 💰 Total price
+#     # 💰 Total
 #     total_price = models.DecimalField(
 #         max_digits=10,
 #         decimal_places=2,
@@ -401,7 +412,7 @@ class Order(models.Model):
 #         null=True,
 #     )
 
-#     # 📞 Snapshot customer details
+#     # 📞 Customer snapshot
 #     customer_phone = models.CharField(
 #         max_length=15,
 #         blank=True,
@@ -421,7 +432,7 @@ class Order(models.Model):
 #         default="pending",
 #     )
 
-#     # 🚦 Status
+#     # 🚦 Order status
 #     status = models.CharField(
 #         max_length=20,
 #         choices=STATUS_CHOICES,
@@ -432,6 +443,9 @@ class Order(models.Model):
 #         auto_now_add=True
 #     )
 
+#     class Meta:
+#         ordering = ["-created_at"]
+
 #     def save(self, *args, **kwargs):
 
 #         # calculate total price
@@ -441,8 +455,9 @@ class Order(models.Model):
 #                 * Decimal(self.weight)
 #             )
 
-#         # snapshot user details
+#         # snapshot customer details
 #         if self.user:
+
 #             self.customer_phone = (
 #                 self.user.phone
 #             )
@@ -454,15 +469,11 @@ class Order(models.Model):
 #         super().save(*args, **kwargs)
 
 #     def __str__(self):
+
 #         return (
 #             f"{self.user.username} - "
 #             f"{self.service.name} "
 #             f"({self.status})"
 #         )
 
-
-
-
-
-
-
+        
