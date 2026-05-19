@@ -3,100 +3,84 @@ from django.urls import path
 from .views import (
     RegisterView,
     LoginView,
-
-    # Shops
     ShopListCreateView,
     ShopDetailView,
-
-    # Services
     ServiceListCreateView,
-
-    # Orders
     OrderListCreateView,
     OwnerOrderListView,
     UpdateOrderStatusView,
     ArchiveOrderView,
     ArchivedOrdersView,
-
-    # Featured
     featured_shops,
 )
 
 urlpatterns = [
 
-    # =========================
     # 🔐 AUTH
-    # =========================
     path(
-        "register/",
+        'register/',
         RegisterView.as_view()
     ),
 
     path(
-        "login/",
+        'login/',
         LoginView.as_view()
     ),
 
-    # =========================
     # 🏪 SHOPS
-    # =========================
     path(
-        "shops/",
+        'shops/',
         ShopListCreateView.as_view()
     ),
 
     path(
-        "shops/<int:pk>/",
+        'shops/<int:pk>/',
         ShopDetailView.as_view()
     ),
 
-    # =========================
     # 🧺 SERVICES
-    # =========================
     path(
-        "services/",
+        'services/',
         ServiceListCreateView.as_view()
     ),
 
-    # =========================
     # 📦 ORDERS
-    # =========================
     path(
-        "orders/",
+        'orders/',
         OrderListCreateView.as_view()
     ),
 
     path(
-        "owner/orders/",
+        'owner/orders/',
         OwnerOrderListView.as_view()
     ),
 
+    # ARCHIVED
     path(
-        "orders/<int:pk>/status/",
-        UpdateOrderStatusView.as_view()
-    ),
-
-    # =========================
-    # 📁 ARCHIVE ORDERS
-    # =========================
-
-    # Archive single completed order
-    path(
-        "orders/<int:pk>/archive/",
-        ArchiveOrderView.as_view()
-    ),
-
-    # Get archived orders
-    path(
-        "archived-orders/",
+        'orders/archived/',
         ArchivedOrdersView.as_view()
     ),
 
-    # =========================
-    # ⭐ FEATURED SHOPS
-    # =========================
     path(
-        "featured-shops/",
+        'owner/orders/archived/',
+        ArchivedOrdersView.as_view()
+    ),
+
+    # STATUS
+    path(
+        'orders/<int:pk>/status/',
+        UpdateOrderStatusView.as_view()
+    ),
+
+    # ARCHIVE
+    path(
+        'orders/<int:pk>/archive/',
+        ArchiveOrderView.as_view()
+    ),
+
+    # ⭐ FEATURED
+    path(
+        'featured-shops/',
         featured_shops
     ),
 ]
@@ -104,82 +88,106 @@ urlpatterns = [
 
 
 # from django.urls import path
+
 # from .views import (
 #     RegisterView,
 #     LoginView,
+
+#     # Shops
 #     ShopListCreateView,
-#     ShopDetailView,  # ✅ ADD THIS
+#     ShopDetailView,
+
+#     # Services
 #     ServiceListCreateView,
+
+#     # Orders
 #     OrderListCreateView,
 #     OwnerOrderListView,
 #     UpdateOrderStatusView,
-#     featured_shops,  # ✅ move here
+#     ArchiveOrderView,
+#     ArchivedOrdersView,
+
+#     # Featured
+#     featured_shops,
 # )
 
 # urlpatterns = [
-#     # 🔐 Auth
-#     path('register/', RegisterView.as_view()),
-#     path('login/', LoginView.as_view()),
 
-#     # 🏪 Shops
-#     path('shops/', ShopListCreateView.as_view()),
-#     path('shops/<int:pk>/', ShopDetailView.as_view()),  # ✅ IMPORTANT (edit/delete)
+#     # =========================
+#     # 🔐 AUTH
+#     # =========================
+#     path(
+#         "register/",
+#         RegisterView.as_view()
+#     ),
 
-#     # 🧺 Services
-#     path('services/', ServiceListCreateView.as_view()),
+#     path(
+#         "login/",
+#         LoginView.as_view()
+#     ),
 
-#     # 📦 Orders
-#     path('orders/', OrderListCreateView.as_view()),
-#     path('owner/orders/', OwnerOrderListView.as_view()),
-#     path('orders/<int:pk>/status/', UpdateOrderStatusView.as_view()),
-    
+#     # =========================
+#     # 🏪 SHOPS
+#     # =========================
+#     path(
+#         "shops/",
+#         ShopListCreateView.as_view()
+#     ),
 
-#     # ⭐ Featured
-#     path('featured-shops/', featured_shops),
-# ]    
+#     path(
+#         "shops/<int:pk>/",
+#         ShopDetailView.as_view()
+#     ),
 
+#     # =========================
+#     # 🧺 SERVICES
+#     # =========================
+#     path(
+#         "services/",
+#         ServiceListCreateView.as_view()
+#     ),
 
+#     # =========================
+#     # 📦 ORDERS
+#     # =========================
+#     path(
+#         "orders/",
+#         OrderListCreateView.as_view()
+#     ),
 
+#     path(
+#         "owner/orders/",
+#         OwnerOrderListView.as_view()
+#     ),
 
+#     path(
+#         "orders/<int:pk>/status/",
+#         UpdateOrderStatusView.as_view()
+#     ),
 
+#     # =========================
+#     # 📁 ARCHIVE ORDERS
+#     # =========================
 
+#     # Archive single completed order
+#     path(
+#         "orders/<int:pk>/archive/",
+#         ArchiveOrderView.as_view()
+#     ),
 
+#     # Get archived orders
+#     path(
+#         "archived-orders/",
+#         ArchivedOrdersView.as_view()
+#     ),
 
-
-
-
-
-
-
-# # from django.urls import path
-# # from .views import (
-# #     RegisterView,
-# #     LoginView,
-# #     ShopListCreateView,
-# #     ServiceListCreateView,   # ✅ NOW EXISTS
-# #     OrderListCreateView,
-# #     OwnerOrderListView,
-# #     UpdateOrderStatusView,
-  
-    
-# # )
-# # from .views import featured_shops
-
-
-# # urlpatterns = [
-# #     path('register/', RegisterView.as_view()),
-# #     path('login/', LoginView.as_view()),
-
-# #     path('shops/', ShopListCreateView.as_view()),
-# #     path('services/', ServiceListCreateView.as_view()),
-
-# #     path('orders/', OrderListCreateView.as_view()),
-# #     path('owner/orders/', OwnerOrderListView.as_view()),
-# #     path('orders/<int:pk>/status/', UpdateOrderStatusView.as_view()),
-# #     path('featured-shops/', featured_shops),
-    
- 
-
-# # ]
+#     # =========================
+#     # ⭐ FEATURED SHOPS
+#     # =========================
+#     path(
+#         "featured-shops/",
+#         featured_shops
+#     ),
+# ]
 
 

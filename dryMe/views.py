@@ -522,7 +522,7 @@ class ArchiveOrderView(APIView):
         IsAuthenticated
     ]
 
-    def patch(self, request, pk):
+    def put(self, request, pk):
 
         try:
 
@@ -558,6 +558,17 @@ class ArchiveOrderView(APIView):
                 {
                     "error":
                     "Only completed orders can be archived"
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # PREVENT DOUBLE ARCHIVE
+        if order.archived:
+
+            return Response(
+                {
+                    "error":
+                    "Order already archived"
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
@@ -610,13 +621,23 @@ class ArchivedOrdersView(
 
 
 # from rest_framework import generics, permissions, parsers, status
-# from rest_framework.permissions import IsAuthenticated, AllowAny
-# from rest_framework.decorators import api_view, permission_classes
+# from rest_framework.permissions import (
+#     IsAuthenticated,
+#     AllowAny
+# )
+# from rest_framework.decorators import (
+#     api_view,
+#     permission_classes
+# )
 # from rest_framework.response import Response
 # from rest_framework.views import APIView
-# from rest_framework_simplejwt.tokens import RefreshToken
+# from rest_framework_simplejwt.tokens import (
+#     RefreshToken
+# )
 # from django.contrib.auth import authenticate
+# from django.utils import timezone
 # import random
+
 # from .models import Order, Shop, Service
 # from .serializers import (
 #     ShopSerializer,
@@ -635,7 +656,9 @@ class ArchivedOrdersView(
 
 #     def post(self, request):
 
-#         serializer = RegisterSerializer(data=request.data)
+#         serializer = RegisterSerializer(
+#             data=request.data
+#         )
 
 #         if serializer.is_valid():
 
@@ -662,8 +685,13 @@ class ArchivedOrdersView(
 
 #     def post(self, request):
 
-#         username = request.data.get("username")
-#         password = request.data.get("password")
+#         username = request.data.get(
+#             "username"
+#         )
+
+#         password = request.data.get(
+#             "password"
+#         )
 
 #         user = authenticate(
 #             username=username,
@@ -671,17 +699,29 @@ class ArchivedOrdersView(
 #         )
 
 #         if user is None:
+
 #             return Response(
-#                 {"error": "Invalid credentials"},
+#                 {
+#                     "error":
+#                     "Invalid credentials"
+#                 },
 #                 status=status.HTTP_401_UNAUTHORIZED
 #             )
 
-#         refresh = RefreshToken.for_user(user)
+#         refresh = RefreshToken.for_user(
+#             user
+#         )
 
 #         return Response({
-#             "access": str(refresh.access_token),
+#             "access": str(
+#                 refresh.access_token
+#             ),
 #             "refresh": str(refresh),
-#             "role": getattr(user, "role", "customer"),
+#             "role": getattr(
+#                 user,
+#                 "role",
+#                 "customer"
+#             ),
 #             "username": user.username
 #         })
 
@@ -689,12 +729,15 @@ class ArchivedOrdersView(
 # # ===============================
 # # 🏪 SHOPS (LIST + CREATE)
 # # ===============================
-# class ShopListCreateView(generics.ListCreateAPIView):
+# class ShopListCreateView(
+#     generics.ListCreateAPIView
+# ):
 
 #     serializer_class = ShopSerializer
-#     permission_classes = [IsAuthenticated]
+#     permission_classes = [
+#         IsAuthenticated
+#     ]
 
-#     # IMPORTANT FOR IMAGE UPLOADS
 #     parser_classes = (
 #         parsers.MultiPartParser,
 #         parsers.FormParser,
@@ -710,16 +753,23 @@ class ArchivedOrdersView(
 #         if not user.is_authenticated:
 #             return Shop.objects.none()
 
-#         role = getattr(user, "role", "customer")
+#         role = getattr(
+#             user,
+#             "role",
+#             "customer"
+#         )
 
 #         # OWNERS SEE THEIR SHOPS
 #         if role == "owner":
+
 #             return Shop.objects.filter(
 #                 owner=user
 #             ).order_by("-id")
 
 #         # CUSTOMERS SEE ALL SHOPS
-#         return Shop.objects.all().order_by("-id")
+#         return Shop.objects.all().order_by(
+#             "-id"
+#         )
 
 #     # =========================
 #     # SERIALIZER CONTEXT
@@ -733,7 +783,12 @@ class ArchivedOrdersView(
 #     # =========================
 #     # CREATE SHOP
 #     # =========================
-#     def create(self, request, *args, **kwargs):
+#     def create(
+#         self,
+#         request,
+#         *args,
+#         **kwargs
+#     ):
 
 #         serializer = self.get_serializer(
 #             data=request.data
@@ -761,65 +816,44 @@ class ArchivedOrdersView(
 # # ===============================
 # # 🏪 SHOP DETAIL
 # # ===============================
-
-# class ShopDetailView(generics.RetrieveUpdateDestroyAPIView):
+# class ShopDetailView(
+#     generics.RetrieveUpdateDestroyAPIView
+# ):
 
 #     serializer_class = ShopSerializer
-#     permission_classes = [IsAuthenticated]
+#     permission_classes = [
+#         IsAuthenticated
+#     ]
+
 #     queryset = Shop.objects.all()
 
-#     # IMPORTANT
 #     parser_classes = [
 #         parsers.MultiPartParser,
 #         parsers.FormParser,
 #     ]
 
+#     # =========================
+#     # SERIALIZER CONTEXT
+#     # =========================
 #     def get_serializer_context(self):
+
 #         return {
 #             "request": self.request
 #         }
 
-#     def update(self, request, *args, **kwargs):
-
-#         shop = self.get_object()
-
-#         if shop.owner != request.user:
-#             return Response(
-#                 {"error": "Not allowed"},
-#                 status=403
-#             )
-
-#         return super().update(
-#             request,
-#             *args,
-#             **kwargs
-#         )
-
-#     def destroy(self, request, *args, **kwargs):
-
-#         shop = self.get_object()
-
-#         if shop.owner != request.user:
-#             return Response(
-#                 {"error": "Not allowed"},
-#                 status=403
-#             )
-
-#         return super().destroy(
-#             request,
-#             *args,
-#             **kwargs
-#         )
-
-
-
 #     # =========================
 #     # UPDATE SHOP
 #     # =========================
-#     def update(self, request, *args, **kwargs):
+#     def update(
+#         self,
+#         request,
+#         *args,
+#         **kwargs
+#     ):
 
 #         shop = self.get_object()
 
+#         # ONLY OWNER CAN EDIT
 #         if shop.owner != request.user:
 
 #             return Response(
@@ -827,7 +861,10 @@ class ArchivedOrdersView(
 #                 status=status.HTTP_403_FORBIDDEN
 #             )
 
-#         partial = kwargs.pop("partial", False)
+#         partial = kwargs.pop(
+#             "partial",
+#             False
+#         )
 
 #         serializer = self.get_serializer(
 #             shop,
@@ -839,7 +876,9 @@ class ArchivedOrdersView(
 
 #             serializer.save()
 
-#             return Response(serializer.data)
+#             return Response(
+#                 serializer.data
+#             )
 
 #         return Response(
 #             serializer.errors,
@@ -849,7 +888,12 @@ class ArchivedOrdersView(
 #     # =========================
 #     # DELETE SHOP
 #     # =========================
-#     def destroy(self, request, *args, **kwargs):
+#     def destroy(
+#         self,
+#         request,
+#         *args,
+#         **kwargs
+#     ):
 
 #         shop = self.get_object()
 
@@ -860,7 +904,11 @@ class ArchivedOrdersView(
 #                 status=status.HTTP_403_FORBIDDEN
 #             )
 
-#         return super().destroy(request, *args, **kwargs)
+#         return super().destroy(
+#             request,
+#             *args,
+#             **kwargs
+#         )
 
 
 # # ===============================
@@ -871,7 +919,9 @@ class ArchivedOrdersView(
 # def featured_shops(request):
 
 #     shops = list(
-#         Shop.objects.select_related("owner").all()
+#         Shop.objects.select_related(
+#             "owner"
+#         ).all()
 #     )
 
 #     random.shuffle(shops)
@@ -885,7 +935,9 @@ class ArchivedOrdersView(
 
 #             unique_shops.append(shop)
 
-#             owners_seen.add(shop.owner.id)
+#             owners_seen.add(
+#                 shop.owner.id
+#             )
 
 #         if len(unique_shops) == 4:
 #             break
@@ -902,7 +954,9 @@ class ArchivedOrdersView(
 # # ===============================
 # # 🧺 SERVICES
 # # ===============================
-# class ServiceListCreateView(generics.ListCreateAPIView):
+# class ServiceListCreateView(
+#     generics.ListCreateAPIView
+# ):
 
 #     serializer_class = ServiceSerializer
 
@@ -910,23 +964,34 @@ class ArchivedOrdersView(
 
 #         queryset = Service.objects.all()
 
-#         shop_id = self.request.query_params.get("shop")
+#         shop_id = self.request.query_params.get(
+#             "shop"
+#         )
 
 #         if shop_id:
-#             queryset = queryset.filter(shop_id=shop_id)
+
+#             queryset = queryset.filter(
+#                 shop_id=shop_id
+#             )
 
 #         return queryset
 
 #     def get_permissions(self):
 
 #         if self.request.method == "POST":
+
 #             return [IsAuthenticated()]
 
 #         return [AllowAny()]
 
-#     def perform_create(self, serializer):
+#     def perform_create(
+#         self,
+#         serializer
+#     ):
 
-#         shop_id = self.request.data.get("shop")
+#         shop_id = self.request.data.get(
+#             "shop"
+#         )
 
 #         try:
 
@@ -947,35 +1012,59 @@ class ArchivedOrdersView(
 # # ===============================
 # # 📦 ORDERS (CUSTOMER)
 # # ===============================
-# class OrderListCreateView(generics.ListCreateAPIView):
+# class OrderListCreateView(
+#     generics.ListCreateAPIView
+# ):
 
 #     serializer_class = OrderSerializer
-#     permission_classes = [IsAuthenticated]
+#     permission_classes = [
+#         IsAuthenticated
+#     ]
 
+#     # =========================
+#     # GET CUSTOMER ORDERS
+#     # =========================
 #     def get_queryset(self):
 
 #         return Order.objects.filter(
+#             user=self.request.user,
+#             archived=False
+#         ).order_by("-created_at")
+
+#     # =========================
+#     # CREATE ORDER
+#     # =========================
+#     def perform_create(
+#         self,
+#         serializer
+#     ):
+
+#         serializer.save(
 #             user=self.request.user
 #         )
-
-#     def perform_create(self, serializer):
-
-#         serializer.save(user=self.request.user)
 
 
 # # ===============================
 # # 🧑‍🔧 OWNER ORDERS
 # # ===============================
-# class OwnerOrderListView(generics.ListAPIView):
+# class OwnerOrderListView(
+#     generics.ListAPIView
+# ):
 
 #     serializer_class = OrderSerializer
-#     permission_classes = [IsAuthenticated]
+#     permission_classes = [
+#         IsAuthenticated
+#     ]
 
 #     def get_queryset(self):
 
 #         user = self.request.user
 
-#         role = getattr(user, "role", "customer")
+#         role = getattr(
+#             user,
+#             "role",
+#             "customer"
+#         )
 
 #         if role != "owner":
 
@@ -984,23 +1073,35 @@ class ArchivedOrdersView(
 #             )
 
 #         return Order.objects.filter(
-#             shop__owner=user
-#         )
+#             shop__owner=user,
+#             archived=False
+#         ).order_by("-created_at")
 
 
 # # ===============================
 # # 🔄 UPDATE ORDER STATUS
 # # ===============================
-# class UpdateOrderStatusView(generics.UpdateAPIView):
+# class UpdateOrderStatusView(
+#     generics.UpdateAPIView
+# ):
 
 #     serializer_class = OrderSerializer
-#     permission_classes = [IsAuthenticated]
+#     permission_classes = [
+#         IsAuthenticated
+#     ]
+
 #     queryset = Order.objects.all()
 
-#     def update(self, request, *args, **kwargs):
+#     def update(
+#         self,
+#         request,
+#         *args,
+#         **kwargs
+#     ):
 
 #         order = self.get_object()
 
+#         # ONLY SHOP OWNER
 #         if order.shop.owner != request.user:
 
 #             return Response(
@@ -1008,13 +1109,123 @@ class ArchivedOrdersView(
 #                 status=status.HTTP_403_FORBIDDEN
 #             )
 
-#         order.status = request.data.get("status")
+#         new_status = request.data.get(
+#             "status"
+#         )
 
+#         valid_statuses = [
+#             "pending",
+#             "washing",
+#             "completed"
+#         ]
+
+#         if new_status not in valid_statuses:
+
+#             return Response(
+#                 {"error": "Invalid status"},
+#                 status=status.HTTP_400_BAD_REQUEST
+#             )
+
+#         order.status = new_status
 #         order.save()
 
 #         return Response({
-#             "message": "Updated"
+#             "message":
+#             "Order status updated"
 #         })
 
 
+# # ===============================
+# # 📁 ARCHIVE ORDER
+# # ===============================
+# class ArchiveOrderView(APIView):
+
+#     permission_classes = [
+#         IsAuthenticated
+#     ]
+
+#     def patch(self, request, pk):
+
+#         try:
+
+#             order = Order.objects.get(
+#                 id=pk
+#             )
+
+#         except Order.DoesNotExist:
+
+#             return Response(
+#                 {"error": "Order not found"},
+#                 status=status.HTTP_404_NOT_FOUND
+#             )
+
+#         # ONLY CUSTOMER OR OWNER
+#         allowed = (
+#             order.user == request.user
+#             or
+#             order.shop.owner == request.user
+#         )
+
+#         if not allowed:
+
+#             return Response(
+#                 {"error": "Not allowed"},
+#                 status=status.HTTP_403_FORBIDDEN
+#             )
+
+#         # ONLY COMPLETED ORDERS
+#         if order.status != "completed":
+
+#             return Response(
+#                 {
+#                     "error":
+#                     "Only completed orders can be archived"
+#                 },
+#                 status=status.HTTP_400_BAD_REQUEST
+#             )
+
+#         # ARCHIVE ORDER
+#         order.archived = True
+#         order.archived_at = timezone.now()
+#         order.save()
+
+#         return Response({
+#             "message":
+#             "Order archived successfully"
+#         })
+
+
+# # ===============================
+# # 📁 ARCHIVED ORDERS
+# # ===============================
+# class ArchivedOrdersView(
+#     generics.ListAPIView
+# ):
+
+#     serializer_class = OrderSerializer
+#     permission_classes = [
+#         IsAuthenticated
+#     ]
+
+#     def get_queryset(self):
+
+#         user = self.request.user
+
+#         # CUSTOMER ARCHIVES
+#         if user.role == "customer":
+
+#             return Order.objects.filter(
+#                 user=user,
+#                 archived=True
+#             ).order_by("-archived_at")
+
+#         # OWNER ARCHIVES
+#         if user.role == "owner":
+
+#             return Order.objects.filter(
+#                 shop__owner=user,
+#                 archived=True
+#             ).order_by("-archived_at")
+
+#         return Order.objects.none()
 
