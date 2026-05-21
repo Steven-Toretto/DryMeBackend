@@ -201,6 +201,11 @@ class Order(models.Model):
         default=False
     )
 
+    archived_at = models.DateTimeField(
+        blank=True,
+        null=True,
+    )
+
     created_at = models.DateTimeField(
         auto_now_add=True
     )
@@ -237,8 +242,6 @@ class Order(models.Model):
             f"{self.service.name} "
             f"({self.status})"
         )
-
-
 
 
 # import os
