@@ -196,14 +196,14 @@ class Order(models.Model):
         default="pending",
     )
 
-    # 📁 ARCHIVE
-    archived = models.BooleanField(
+    # 📁 CUSTOMER ARCHIVE
+    customer_archived = models.BooleanField(
         default=False
     )
 
-    archived_at = models.DateTimeField(
-        blank=True,
-        null=True,
+    # 📁 OWNER ARCHIVE
+    owner_archived = models.BooleanField(
+        default=False
     )
 
     created_at = models.DateTimeField(

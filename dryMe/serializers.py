@@ -84,7 +84,6 @@ class ShopSerializer(serializers.ModelSerializer):
         read_only=True
     )
 
-    # ✅ IMPORTANT FIX
     image = serializers.ImageField(
         required=False,
         allow_null=True
@@ -102,7 +101,9 @@ class ShopSerializer(serializers.ModelSerializer):
             "image",
         )
 
-    # ✅ RETURN FULL IMAGE URL
+    # ===========================
+    # FULL IMAGE URL
+    # ===========================
     def to_representation(self, instance):
 
         representation = super().to_representation(
@@ -114,14 +115,17 @@ class ShopSerializer(serializers.ModelSerializer):
         if instance.image:
 
             try:
+
                 image_url = instance.image.url
 
-                # Cloudinary URL
+                # CLOUDINARY
                 if image_url.startswith("http"):
+
                     representation["image"] = image_url
 
-                # Local media URL
+                # LOCAL MEDIA
                 elif request:
+
                     representation["image"] = (
                         request.build_absolute_uri(
                             image_url
@@ -129,9 +133,11 @@ class ShopSerializer(serializers.ModelSerializer):
                     )
 
                 else:
+
                     representation["image"] = image_url
 
             except Exception:
+
                 representation["image"] = None
 
         return representation
@@ -199,6 +205,17 @@ class OrderSerializer(serializers.ModelSerializer):
         read_only=True
     )
 
+    # ===========================
+    # ARCHIVE FIELDS
+    # ===========================
+    customer_archived = serializers.BooleanField(
+        read_only=True
+    )
+
+    owner_archived = serializers.BooleanField(
+        read_only=True
+    )
+
     class Meta:
         model = Order
 
@@ -219,8 +236,13 @@ class OrderSerializer(serializers.ModelSerializer):
             "status",
             "payment_status",
 
+            # SNAPSHOT
             "customer_phone",
             "customer_location",
+
+            # ARCHIVE
+            "customer_archived",
+            "owner_archived",
 
             "created_at",
         ]
@@ -232,6 +254,8 @@ class OrderSerializer(serializers.ModelSerializer):
             "payment_status",
             "customer_phone",
             "customer_location",
+            "customer_archived",
+            "owner_archived",
             "created_at",
         ]
 

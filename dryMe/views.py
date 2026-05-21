@@ -13,7 +13,6 @@ from rest_framework_simplejwt.tokens import (
     RefreshToken
 )
 from django.contrib.auth import authenticate
-from django.utils import timezone
 import random
 
 from .models import Order, Shop, Service
@@ -406,7 +405,7 @@ class OrderListCreateView(
 
         return Order.objects.filter(
             user=self.request.user,
-            archived=False
+            customer_archived=False
         ).order_by("-created_at")
 
     # =========================
@@ -452,7 +451,7 @@ class OwnerOrderListView(
 
         return Order.objects.filter(
             shop__owner=user,
-            archived=False
+            owner_archived=False
         ).order_by("-created_at")
 
 
@@ -537,20 +536,6 @@ class ArchiveOrderView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # ONLY CUSTOMER OR OWNER
-        allowed = (
-            order.user == request.user
-            or
-            order.shop.owner == request.user
-        )
-
-        if not allowed:
-
-            return Response(
-                {"error": "Not allowed"},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
         # ONLY COMPLETED ORDERS
         if order.status != "completed":
 
@@ -562,26 +547,52 @@ class ArchiveOrderView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # PREVENT DOUBLE ARCHIVE
-        if order.archived:
+        # CUSTOMER ARCHIVE
+        if order.user == request.user:
 
-            return Response(
-                {
-                    "error":
-                    "Order already archived"
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            if order.customer_archived:
 
-        # ARCHIVE ORDER
-        order.archived = True
-        order.archived_at = timezone.now()
-        order.save()
+                return Response(
+                    {
+                        "error":
+                        "Order already archived"
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-        return Response({
-            "message":
-            "Order archived successfully"
-        })
+            order.customer_archived = True
+            order.save()
+
+            return Response({
+                "message":
+                "Customer archived order"
+            })
+
+        # OWNER ARCHIVE
+        if order.shop.owner == request.user:
+
+            if order.owner_archived:
+
+                return Response(
+                    {
+                        "error":
+                        "Order already archived"
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            order.owner_archived = True
+            order.save()
+
+            return Response({
+                "message":
+                "Owner archived order"
+            })
+
+        return Response(
+            {"error": "Not allowed"},
+            status=status.HTTP_403_FORBIDDEN
+        )
 
 
 # ===============================
@@ -600,21 +611,21 @@ class ArchivedOrdersView(
 
         user = self.request.user
 
-        # customer archived orders
+        # CUSTOMER ARCHIVES
         if user.role == "customer":
 
             return Order.objects.filter(
                 user=user,
-                archived=True
-            ).order_by("-archived_at")
+                customer_archived=True
+            ).order_by("-created_at")
 
-        # owner archived orders
+        # OWNER ARCHIVES
         if user.role == "owner":
 
             return Order.objects.filter(
                 shop__owner=user,
-                archived=True
-            ).order_by("-archived_at")
+                owner_archived=True
+            ).order_by("-created_at")
 
         return Order.objects.none()
 
