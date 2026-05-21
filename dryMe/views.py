@@ -600,7 +600,7 @@ class ArchivedOrdersView(
 
         user = self.request.user
 
-        # CUSTOMER ARCHIVES
+        # customer archived orders
         if user.role == "customer":
 
             return Order.objects.filter(
@@ -608,7 +608,7 @@ class ArchivedOrdersView(
                 archived=True
             ).order_by("-archived_at")
 
-        # OWNER ARCHIVES
+        # owner archived orders
         if user.role == "owner":
 
             return Order.objects.filter(

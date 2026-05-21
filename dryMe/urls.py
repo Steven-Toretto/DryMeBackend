@@ -55,30 +55,25 @@ urlpatterns = [
         OwnerOrderListView.as_view()
     ),
 
-    # ARCHIVED
-    path(
-        'orders/archived/',
-        ArchivedOrdersView.as_view()
-    ),
-
-    path(
-        'owner/orders/archived/',
-        ArchivedOrdersView.as_view()
-    ),
-
-    # STATUS
+    # 🔄 UPDATE STATUS
     path(
         'orders/<int:pk>/status/',
         UpdateOrderStatusView.as_view()
     ),
 
-    # ARCHIVE
+    # 📁 ARCHIVE ORDER
     path(
         'orders/<int:pk>/archive/',
         ArchiveOrderView.as_view()
     ),
 
-    # ⭐ FEATURED
+    # 📁 GET ARCHIVED ORDERS
+    path(
+        'orders/archived/',
+        ArchivedOrdersView.as_view()
+    ),
+
+    # ⭐ FEATURED SHOPS
     path(
         'featured-shops/',
         featured_shops
