@@ -7,6 +7,7 @@ from datetime import timedelta
 import os
 import dj_database_url
 import cloudinary
+RENDER = os.environ.get("RENDER", False)
 
 # ===============================
 # BASE DIR
@@ -21,8 +22,8 @@ SECRET_KEY = os.environ.get(
     "django-insecure-xns&xq^j5-y8b=$2p!e+u*h0s0gqqyi7gxxyeo2*vr3)lb4iy8"
 )
 
-# ✅ TEMPORARILY TRUE FOR TESTING
-DEBUG = True
+# DEBUG = True
+DEBUG = not bool(RENDER)
 
 ALLOWED_HOSTS = [
     "drymebackend-2.onrender.com",
@@ -129,11 +130,21 @@ WSGI_APPLICATION = "laundry_backend.wsgi.application"
 # ===============================
 # DATABASE
 # ===============================
-DATABASES = {
-    "default": dj_database_url.config(
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}"
-    )
-}
+
+if RENDER:
+    DATABASES = {
+        "default": dj_database_url.config(
+            conn_max_age=600,
+            ssl_require=True
+        )
+    }
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 # ===============================
 # PASSWORD VALIDATION
@@ -184,22 +195,23 @@ SIMPLE_JWT = {
 # CLOUDINARY CONFIG
 # ===============================
 
-cloudinary.config(
-    cloud_name=os.environ.get("CLOUDINARY_CLOUD_NAME"),
-    api_key=os.environ.get("CLOUDINARY_API_KEY"),
-    api_secret=os.environ.get("CLOUDINARY_API_SECRET"),
-)
+if RENDER:
 
-CLOUDINARY_STORAGE = {
-    "CLOUD_NAME": os.environ.get("CLOUDINARY_CLOUD_NAME"),
-    "API_KEY": os.environ.get("CLOUDINARY_API_KEY"),
-    "API_SECRET": os.environ.get("CLOUDINARY_API_SECRET"),
-}
+    cloudinary.config(
+        cloud_name=os.environ.get("CLOUDINARY_CLOUD_NAME"),
+        api_key=os.environ.get("CLOUDINARY_API_KEY"),
+        api_secret=os.environ.get("CLOUDINARY_API_SECRET"),
+    )
 
-# ✅ USE CLOUDINARY FOR MEDIA
-DEFAULT_FILE_STORAGE = (
-    "cloudinary_storage.storage.MediaCloudinaryStorage"
-)
+    CLOUDINARY_STORAGE = {
+        "CLOUD_NAME": os.environ.get("CLOUDINARY_CLOUD_NAME"),
+        "API_KEY": os.environ.get("CLOUDINARY_API_KEY"),
+        "API_SECRET": os.environ.get("CLOUDINARY_API_SECRET"),
+    }
+
+    DEFAULT_FILE_STORAGE = (
+        "cloudinary_storage.storage.MediaCloudinaryStorage"
+    )
 
 # ===============================
 # MEDIA FILES

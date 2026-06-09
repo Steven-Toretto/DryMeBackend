@@ -234,7 +234,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "weight",
             "total_price",
             "status",
-            "payment_status",
+            
 
             # SNAPSHOT
             "customer_phone",
@@ -251,7 +251,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "user",
             "total_price",
             "status",
-            "payment_status",
+            
             "customer_phone",
             "customer_location",
             "customer_archived",

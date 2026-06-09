@@ -1,3 +1,4 @@
+
 import os
 import uuid
 from decimal import Decimal
@@ -134,10 +135,7 @@ class Order(models.Model):
         ("completed", "Completed"),
     )
 
-    PAYMENT_CHOICES = (
-        ("pending", "Pending"),
-        ("paid", "Paid"),
-    )
+
 
     user = models.ForeignKey(
         User,
@@ -182,12 +180,7 @@ class Order(models.Model):
         null=True,
     )
 
-    # 💳 Payment
-    payment_status = models.CharField(
-        max_length=20,
-        choices=PAYMENT_CHOICES,
-        default="pending",
-    )
+    
 
     # 🚦 Order status
     status = models.CharField(
@@ -244,6 +237,7 @@ class Order(models.Model):
         )
 
 
+# MODELS WITH INTASEND PAYMENT INCLUDED!!!
 # import os
 # import uuid
 # from decimal import Decimal
@@ -279,6 +273,46 @@ class Order(models.Model):
 #     # 📍 Location
 #     location = models.CharField(
 #         max_length=255,
+#         blank=True,
+#         null=True,
+#     )
+
+#     # =========================
+#     # 💳 PAYMENT FIELDS
+#     # =========================
+
+#     # has owner paid?
+#     is_paid = models.BooleanField(
+#         default=False
+#     )
+
+#     # subscription active?
+#     subscription_active = models.BooleanField(
+#         default=False
+#     )
+
+#     # IntaSend payment reference
+#     payment_reference = models.CharField(
+#         max_length=255,
+#         blank=True,
+#         null=True,
+#     )
+
+#     # phone used for payment
+#     payment_phone = models.CharField(
+#         max_length=20,
+#         blank=True,
+#         null=True,
+#     )
+
+#     # subscription expiry
+#     subscription_expiry = models.DateTimeField(
+#         blank=True,
+#         null=True,
+#     )
+
+#     # payment date
+#     paid_at = models.DateTimeField(
 #         blank=True,
 #         null=True,
 #     )
@@ -442,6 +476,16 @@ class Order(models.Model):
 #         default="pending",
 #     )
 
+#     # 📁 CUSTOMER ARCHIVE
+#     customer_archived = models.BooleanField(
+#         default=False
+#     )
+
+#     # 📁 OWNER ARCHIVE
+#     owner_archived = models.BooleanField(
+#         default=False
+#     )
+
 #     created_at = models.DateTimeField(
 #         auto_now_add=True
 #     )
@@ -453,8 +497,11 @@ class Order(models.Model):
 
 #         # calculate total price
 #         if self.service and self.weight:
+
 #             self.total_price = (
-#                 Decimal(self.service.price_per_kg)
+#                 Decimal(
+#                     self.service.price_per_kg
+#                 )
 #                 * Decimal(self.weight)
 #             )
 
@@ -478,5 +525,3 @@ class Order(models.Model):
 #             f"{self.service.name} "
 #             f"({self.status})"
 #         )
-
-        

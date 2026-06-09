@@ -1,4 +1,6 @@
 from django.urls import path
+from django.conf import settings
+from django.conf.urls.static import static
 
 from .views import (
     RegisterView,
@@ -11,7 +13,6 @@ from .views import (
     UpdateOrderStatusView,
     ArchiveOrderView,
     ArchivedOrdersView,
-    featured_shops,
 )
 
 urlpatterns = [
@@ -44,12 +45,13 @@ urlpatterns = [
         ServiceListCreateView.as_view()
     ),
 
-    # 📦 ORDERS
+    # 📦 CUSTOMER ORDERS
     path(
         'orders/',
         OrderListCreateView.as_view()
     ),
 
+    # 📦 OWNER ORDERS
     path(
         'owner/orders/',
         OwnerOrderListView.as_view()
@@ -67,20 +69,25 @@ urlpatterns = [
         ArchiveOrderView.as_view()
     ),
 
-    # 📁 GET ARCHIVED ORDERS
+    # 📁 CUSTOMER ARCHIVED ORDERS
     path(
         'orders/archived/',
         ArchivedOrdersView.as_view()
     ),
 
-    # ⭐ FEATURED SHOPS
+    # 📁 OWNER ARCHIVED ORDERS
     path(
-        'featured-shops/',
-        featured_shops
+        'owner/orders/archived/',
+        ArchivedOrdersView.as_view()
     ),
+
 ]
 
-
+if settings.DEBUG:
+    urlpatterns += static(
+        settings.MEDIA_URL,
+        document_root=settings.MEDIA_ROOT
+    )
 
 # from django.urls import path
 

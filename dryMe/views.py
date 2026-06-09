@@ -646,7 +646,8 @@ class ArchivedOrdersView(
 #     RefreshToken
 # )
 # from django.contrib.auth import authenticate
-# from django.utils import timezone
+# from decouple import config
+# from intasend import APIService
 # import random
 
 # from .models import Order, Shop, Service
@@ -656,6 +657,24 @@ class ArchivedOrdersView(
 #     OrderSerializer,
 #     RegisterSerializer
 # )
+
+# # ===============================
+# # 💳 INTASEND CONFIG
+# # ===============================
+# INTASEND_PUBLISHABLE_KEY = config(
+#     "INTASEND_PUBLISHABLE_KEY"
+# )
+
+# INTASEND_SECRET_KEY = config(
+#     "INTASEND_SECRET_KEY"
+# )
+
+# intasend = APIService(
+#     token=INTASEND_SECRET_KEY,
+#     publishable_key=INTASEND_PUBLISHABLE_KEY,
+#     test=True,  # change to False in production
+# )
+
 
 # # ===============================
 # # 🔐 REGISTER
@@ -736,6 +755,101 @@ class ArchivedOrdersView(
 #             "username": user.username
 #         })
 
+
+# # ===============================
+# # 💳 PAY SHOP CREATION FEE
+# # ===============================
+# class PayShopFeeView(APIView):
+
+#     permission_classes = [
+#         IsAuthenticated
+#     ]
+
+#     def post(self, request):
+
+#         user = request.user
+
+#         # only owners
+#         if user.role != "owner":
+
+#             return Response(
+#                 {
+#                     "error":
+#                     "Only owners can make this payment"
+#                 },
+#                 status=status.HTTP_403_FORBIDDEN
+#             )
+
+#         # prevent double payment
+#         if user.has_paid_shop_fee:
+
+#             return Response(
+#                 {
+#                     "message":
+#                     "Shop fee already paid"
+#                 }
+#             )
+
+#         phone = request.data.get(
+#             "phone"
+#         )
+
+#         if not phone:
+
+#             return Response(
+#                 {
+#                     "error":
+#                     "Phone number required"
+#                 },
+#                 status=status.HTTP_400_BAD_REQUEST
+#             )
+
+#         try:
+
+#             # =========================
+#             # SEND STK PUSH
+#             # =========================
+#             response = (
+#                 intasend.collect.mpesa_stk_push(
+#                     phone_number=phone,
+#                     amount=500,
+#                     email=f"{user.username}@dryme.com",
+#                     narrative="DryMe Shop Fee"
+#                 )
+#             )
+
+#             # =========================
+#             # SUCCESS
+#             # =========================
+#             user.has_paid_shop_fee = True
+
+#             # save payment reference
+#             user.payment_reference = (
+#                 response.get("invoice", {})
+#                 .get("invoice_id")
+#             )
+
+#             user.save()
+
+#             return Response({
+
+#                 "message":
+#                 "Payment successful",
+
+#                 "payment":
+#                 response
+
+#             })
+
+#         except Exception as e:
+
+#             return Response(
+#                 {
+#                     "error":
+#                     str(e)
+#                 },
+#                 status=status.HTTP_400_BAD_REQUEST
+#             )
 
 # # ===============================
 # # 🏪 SHOPS (LIST + CREATE)
@@ -843,18 +957,12 @@ class ArchivedOrdersView(
 #         parsers.FormParser,
 #     ]
 
-#     # =========================
-#     # SERIALIZER CONTEXT
-#     # =========================
 #     def get_serializer_context(self):
 
 #         return {
 #             "request": self.request
 #         }
 
-#     # =========================
-#     # UPDATE SHOP
-#     # =========================
 #     def update(
 #         self,
 #         request,
@@ -864,7 +972,6 @@ class ArchivedOrdersView(
 
 #         shop = self.get_object()
 
-#         # ONLY OWNER CAN EDIT
 #         if shop.owner != request.user:
 
 #             return Response(
@@ -896,9 +1003,6 @@ class ArchivedOrdersView(
 #             status=status.HTTP_400_BAD_REQUEST
 #         )
 
-#     # =========================
-#     # DELETE SHOP
-#     # =========================
 #     def destroy(
 #         self,
 #         request,
@@ -1032,19 +1136,13 @@ class ArchivedOrdersView(
 #         IsAuthenticated
 #     ]
 
-#     # =========================
-#     # GET CUSTOMER ORDERS
-#     # =========================
 #     def get_queryset(self):
 
 #         return Order.objects.filter(
 #             user=self.request.user,
-#             archived=False
+#             customer_archived=False
 #         ).order_by("-created_at")
 
-#     # =========================
-#     # CREATE ORDER
-#     # =========================
 #     def perform_create(
 #         self,
 #         serializer
@@ -1085,7 +1183,7 @@ class ArchivedOrdersView(
 
 #         return Order.objects.filter(
 #             shop__owner=user,
-#             archived=False
+#             owner_archived=False
 #         ).order_by("-created_at")
 
 
@@ -1112,7 +1210,6 @@ class ArchivedOrdersView(
 
 #         order = self.get_object()
 
-#         # ONLY SHOP OWNER
 #         if order.shop.owner != request.user:
 
 #             return Response(
@@ -1155,7 +1252,7 @@ class ArchivedOrdersView(
 #         IsAuthenticated
 #     ]
 
-#     def patch(self, request, pk):
+#     def put(self, request, pk):
 
 #         try:
 
@@ -1170,21 +1267,6 @@ class ArchivedOrdersView(
 #                 status=status.HTTP_404_NOT_FOUND
 #             )
 
-#         # ONLY CUSTOMER OR OWNER
-#         allowed = (
-#             order.user == request.user
-#             or
-#             order.shop.owner == request.user
-#         )
-
-#         if not allowed:
-
-#             return Response(
-#                 {"error": "Not allowed"},
-#                 status=status.HTTP_403_FORBIDDEN
-#             )
-
-#         # ONLY COMPLETED ORDERS
 #         if order.status != "completed":
 
 #             return Response(
@@ -1195,15 +1277,52 @@ class ArchivedOrdersView(
 #                 status=status.HTTP_400_BAD_REQUEST
 #             )
 
-#         # ARCHIVE ORDER
-#         order.archived = True
-#         order.archived_at = timezone.now()
-#         order.save()
+#         # CUSTOMER ARCHIVE
+#         if order.user == request.user:
 
-#         return Response({
-#             "message":
-#             "Order archived successfully"
-#         })
+#             if order.customer_archived:
+
+#                 return Response(
+#                     {
+#                         "error":
+#                         "Order already archived"
+#                     },
+#                     status=status.HTTP_400_BAD_REQUEST
+#                 )
+
+#             order.customer_archived = True
+#             order.save()
+
+#             return Response({
+#                 "message":
+#                 "Customer archived order"
+#             })
+
+#         # OWNER ARCHIVE
+#         if order.shop.owner == request.user:
+
+#             if order.owner_archived:
+
+#                 return Response(
+#                     {
+#                         "error":
+#                         "Order already archived"
+#                     },
+#                     status=status.HTTP_400_BAD_REQUEST
+#                 )
+
+#             order.owner_archived = True
+#             order.save()
+
+#             return Response({
+#                 "message":
+#                 "Owner archived order"
+#             })
+
+#         return Response(
+#             {"error": "Not allowed"},
+#             status=status.HTTP_403_FORBIDDEN
+#         )
 
 
 # # ===============================
@@ -1227,16 +1346,19 @@ class ArchivedOrdersView(
 
 #             return Order.objects.filter(
 #                 user=user,
-#                 archived=True
-#             ).order_by("-archived_at")
+#                 customer_archived=True
+#             ).order_by("-created_at")
 
 #         # OWNER ARCHIVES
 #         if user.role == "owner":
 
 #             return Order.objects.filter(
 #                 shop__owner=user,
-#                 archived=True
-#             ).order_by("-archived_at")
+#                 owner_archived=True
+#             ).order_by("-created_at")
 
 #         return Order.objects.none()
+
+
+
 
