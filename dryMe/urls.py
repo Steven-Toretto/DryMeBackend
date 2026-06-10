@@ -13,6 +13,7 @@ from .views import (
     UpdateOrderStatusView,
     ArchiveOrderView,
     ArchivedOrdersView,
+    featured_shops,
 )
 
 urlpatterns = [
@@ -39,6 +40,12 @@ urlpatterns = [
         ShopDetailView.as_view()
     ),
 
+    # ⭐ FEATURED SHOPS (PUBLIC)
+    path(
+        'featured-shops/',
+        featured_shops
+    ),
+
     # 🧺 SERVICES
     path(
         'services/',
@@ -51,13 +58,13 @@ urlpatterns = [
         OrderListCreateView.as_view()
     ),
 
-    # 📦 OWNER ORDERS
+    # ✅ ARCHIVED ORDERS — must come BEFORE orders/<int:pk>/
     path(
-        'owner/orders/',
-        OwnerOrderListView.as_view()
+        'orders/archived/',
+        ArchivedOrdersView.as_view()
     ),
 
-    # 🔄 UPDATE STATUS
+    # 🔄 UPDATE ORDER STATUS
     path(
         'orders/<int:pk>/status/',
         UpdateOrderStatusView.as_view()
@@ -69,13 +76,13 @@ urlpatterns = [
         ArchiveOrderView.as_view()
     ),
 
-    # 📁 CUSTOMER ARCHIVED ORDERS
+    # 📦 OWNER ORDERS
     path(
-        'orders/archived/',
-        ArchivedOrdersView.as_view()
+        'owner/orders/',
+        OwnerOrderListView.as_view()
     ),
 
-    # 📁 OWNER ARCHIVED ORDERS
+    # ✅ OWNER ARCHIVED ORDERS — must come BEFORE owner/orders/<int:pk>/
     path(
         'owner/orders/archived/',
         ArchivedOrdersView.as_view()
@@ -88,108 +95,3 @@ if settings.DEBUG:
         settings.MEDIA_URL,
         document_root=settings.MEDIA_ROOT
     )
-
-# from django.urls import path
-
-# from .views import (
-#     RegisterView,
-#     LoginView,
-
-#     # Shops
-#     ShopListCreateView,
-#     ShopDetailView,
-
-#     # Services
-#     ServiceListCreateView,
-
-#     # Orders
-#     OrderListCreateView,
-#     OwnerOrderListView,
-#     UpdateOrderStatusView,
-#     ArchiveOrderView,
-#     ArchivedOrdersView,
-
-#     # Featured
-#     featured_shops,
-# )
-
-# urlpatterns = [
-
-#     # =========================
-#     # 🔐 AUTH
-#     # =========================
-#     path(
-#         "register/",
-#         RegisterView.as_view()
-#     ),
-
-#     path(
-#         "login/",
-#         LoginView.as_view()
-#     ),
-
-#     # =========================
-#     # 🏪 SHOPS
-#     # =========================
-#     path(
-#         "shops/",
-#         ShopListCreateView.as_view()
-#     ),
-
-#     path(
-#         "shops/<int:pk>/",
-#         ShopDetailView.as_view()
-#     ),
-
-#     # =========================
-#     # 🧺 SERVICES
-#     # =========================
-#     path(
-#         "services/",
-#         ServiceListCreateView.as_view()
-#     ),
-
-#     # =========================
-#     # 📦 ORDERS
-#     # =========================
-#     path(
-#         "orders/",
-#         OrderListCreateView.as_view()
-#     ),
-
-#     path(
-#         "owner/orders/",
-#         OwnerOrderListView.as_view()
-#     ),
-
-#     path(
-#         "orders/<int:pk>/status/",
-#         UpdateOrderStatusView.as_view()
-#     ),
-
-#     # =========================
-#     # 📁 ARCHIVE ORDERS
-#     # =========================
-
-#     # Archive single completed order
-#     path(
-#         "orders/<int:pk>/archive/",
-#         ArchiveOrderView.as_view()
-#     ),
-
-#     # Get archived orders
-#     path(
-#         "archived-orders/",
-#         ArchivedOrdersView.as_view()
-#     ),
-
-#     # =========================
-#     # ⭐ FEATURED SHOPS
-#     # =========================
-#     path(
-#         "featured-shops/",
-#         featured_shops
-#     ),
-# ]
-
-
