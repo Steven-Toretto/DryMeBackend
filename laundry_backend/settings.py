@@ -186,6 +186,11 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 10,
 }
 
+# site admin
+AUTHENTICATION_BACKENDS = [
+    'dryMe.backends.EmailBackend',
+]
+
 # ===============================
 # JWT
 # ===============================
