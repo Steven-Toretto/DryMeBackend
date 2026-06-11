@@ -640,21 +640,25 @@ class ArchivedOrdersView(
         return Order.objects.none()
 
 
-# ===============================
-# 🔧 TEMP: CREATE SUPERUSER
-# ===============================
+# 
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def create_superuser(request):
     from django.contrib.auth import get_user_model
     User = get_user_model()
 
-    if not User.objects.filter(email="admin@dryme.com").exists():
-        User.objects.create_superuser(
-            email="adminsteven@dryme.com",
-            username="steven",
-            password="adminsteven",
-        )
-        return Response({"message": "Superuser created"})
+    # Delete old attempt first
+    User.objects.filter(email="admin@dryme.com").delete()
 
-    return Response({"message": "Already exists"})
+    user = User(
+        email="admin@dryme.com",
+        username="admin",
+        role="owner",
+        is_staff=True,
+        is_superuser=True,
+        is_active=True,
+    )
+    user.set_password("AdminDryMe2026!")
+    user.save()
+
+    return Response({"message": f"Superuser created: {user.email}"})
