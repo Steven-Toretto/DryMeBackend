@@ -8,12 +8,14 @@ from .views import (
     ShopListCreateView,
     ShopDetailView,
     ServiceListCreateView,
+    ServiceDetailView,
     OrderListCreateView,
     OwnerOrderListView,
     UpdateOrderStatusView,
     ArchiveOrderView,
     ArchivedOrdersView,
     featured_shops,
+    
 )
 
 urlpatterns = [
@@ -50,6 +52,12 @@ urlpatterns = [
     path(
         'services/',
         ServiceListCreateView.as_view()
+    ),
+
+    # 🧺 SERVICE DETAIL (EDIT + DELETE)
+    path(
+        'services/<int:pk>/',
+        ServiceDetailView.as_view()
     ),
 
     # 📦 CUSTOMER ORDERS

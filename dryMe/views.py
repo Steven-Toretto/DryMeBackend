@@ -397,6 +397,52 @@ class ServiceListCreateView(
 
 
 # ===============================
+# 🧺 SERVICE DETAIL (EDIT + DELETE)
+# ===============================
+class ServiceDetailView(
+    generics.RetrieveUpdateDestroyAPIView
+):
+    serializer_class = ServiceSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Service.objects.all()
+
+    def get_object(self):
+        service = super().get_object()
+
+        # Only the shop owner can edit or delete
+        if self.request.method in ["PUT", "PATCH", "DELETE"]:
+            if service.shop.owner != self.request.user:
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied(
+                    "You do not own this service."
+                )
+        return service
+
+    def destroy(self, request, *args, **kwargs):
+        service = self.get_object()
+
+        # Warn instead of hard delete if orders exist
+        has_orders = Order.objects.filter(
+            service=service
+        ).exists()
+
+        if has_orders:
+            return Response(
+                {
+                    "error": (
+                        "Cannot delete this service because it has existing orders. "
+                        "Consider renaming it instead."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return super().destroy(request, *args, **kwargs)
+
+
+# ===============================
 # 📦 ORDERS (CUSTOMER)
 # ===============================
 class OrderListCreateView(
@@ -638,4 +684,5 @@ class ArchivedOrdersView(
             ).order_by("-created_at")
 
         return Order.objects.none()
+
 

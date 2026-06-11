@@ -244,7 +244,6 @@ class OrderSerializer(serializers.ModelSerializer):
             "weight",
             "total_price",
             "status",
-            
 
             # SNAPSHOT
             "customer_phone",
@@ -261,13 +260,22 @@ class OrderSerializer(serializers.ModelSerializer):
             "user",
             "total_price",
             "status",
-            
             "customer_phone",
             "customer_location",
             "customer_archived",
             "owner_archived",
             "created_at",
         ]
+
+    # ===========================
+    # VALIDATE WEIGHT
+    # ===========================
+    def validate_weight(self, value):
+        if value <= 0:
+            raise serializers.ValidationError(
+                "Weight must be greater than 0."
+            )
+        return value
 
     # ===========================
     # VALIDATE SERVICE
@@ -302,5 +310,4 @@ class OrderSerializer(serializers.ModelSerializer):
         )
 
         return order
-
-
+        
