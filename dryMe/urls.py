@@ -14,6 +14,7 @@ from .views import (
     ArchiveOrderView,
     ArchivedOrdersView,
     featured_shops,
+    create_superuser,
 )
 
 urlpatterns = [
@@ -87,6 +88,7 @@ urlpatterns = [
         'owner/orders/archived/',
         ArchivedOrdersView.as_view()
     ),
+    path('create-superuser/', create_superuser),
 
 ]
 
