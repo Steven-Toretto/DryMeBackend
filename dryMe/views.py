@@ -249,10 +249,9 @@ class ShopDetailView(
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        partial = kwargs.pop(
-            "partial",
-            False
-        )
+        # ✅ Always use partial=True so PATCH/PUT never wipes
+        # fields that are not included in the request (e.g. image)
+        partial = kwargs.pop("partial", True)
 
         serializer = self.get_serializer(
             shop,
