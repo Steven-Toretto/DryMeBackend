@@ -213,9 +213,15 @@ if RENDER:
         "API_SECRET": os.environ.get("CLOUDINARY_API_SECRET"),
     }
 
-    DEFAULT_FILE_STORAGE = (
-        "cloudinary_storage.storage.MediaCloudinaryStorage"
-    )
+    # Django 4.2+ uses STORAGES dict — DEFAULT_FILE_STORAGE is ignored
+    STORAGES = {
+        "default": {
+            "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
 
 # ===============================
 # MEDIA FILES
@@ -229,9 +235,7 @@ MEDIA_ROOT = BASE_DIR / "media"
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-STATICFILES_STORAGE = (
-    "whitenoise.storage.CompressedManifestStaticFilesStorage"
-)
+# STATICFILES_STORAGE is now handled inside the STORAGES dict above (Django 4.2+)
 
 # ===============================
 # INTERNATIONALIZATION
