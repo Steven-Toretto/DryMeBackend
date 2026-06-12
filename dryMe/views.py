@@ -105,6 +105,8 @@ class LoginView(APIView):
                 refresh.access_token
             ),
             "refresh": str(refresh),
+            "id": user.id,
+            "email": user.email,
             "role": getattr(
                 user,
                 "role",
