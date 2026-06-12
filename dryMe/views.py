@@ -353,6 +353,9 @@ class MpesaSTKPushView(APIView):
                 status=status.HTTP_502_BAD_GATEWAY
             )
 
+        # Log full Safaricom response for debugging
+        print("[MPESA RESPONSE]", response)
+
         response_code = response.get("ResponseCode")
 
         if response_code == "0":
@@ -834,3 +837,36 @@ class ArchivedOrdersView(
 
         return Order.objects.none()
 
+
+# ===============================
+# 🔧 TEMP: CREATE SUPERUSER
+# ===============================
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def create_superuser(request):
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+
+    # Delete old attempt
+    User.objects.filter(email="admin@dryme.com").delete()
+
+    user = User(
+        email="admin@dryme.com",
+        username="admin",
+        role="owner",
+        is_staff=True,
+        is_superuser=True,
+        is_active=True,
+    )
+    user.set_password("AdminDryMe2026!")
+    user.save()
+
+    # Verify it was saved correctly
+    saved = User.objects.get(email="admin@dryme.com")
+    return Response({
+        "email": saved.email,
+        "is_staff": saved.is_staff,
+        "is_superuser": saved.is_superuser,
+        "is_active": saved.is_active,
+        "has_usable_password": saved.has_usable_password(),
+    })
