@@ -53,7 +53,7 @@ def stk_push(phone, amount, order_id):
         "PartyA": phone,
         "PartyB": "600000",  # Sandbox till PartyB
         "PhoneNumber": phone,
-        "CallBackURL": settings.CALLBACK_URL,
+        "CallBackURL": settings.MPESA_CALLBACK_URL,
         "AccountReference": str(order_id),
         "TransactionDesc": "Laundry Payment"
     }
