@@ -309,7 +309,17 @@ class MpesaSTKPushView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, order_id):
-        from .mpesa import stk_push
+        print("[PAY] View hit - order_id:", order_id)
+
+        try:
+            from .mpesa import stk_push
+            print("[PAY] mpesa imported successfully")
+        except Exception as import_err:
+            print("[PAY] mpesa import FAILED:", str(import_err))
+            return Response(
+                {"error": f"Import error: {str(import_err)}"},
+                status=status.HTTP_502_BAD_GATEWAY
+            )
 
         try:
             order = Order.objects.get(
