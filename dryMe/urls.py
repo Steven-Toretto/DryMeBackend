@@ -14,6 +14,9 @@ from .views import (
     UpdateOrderStatusView,
     ArchiveOrderView,
     ArchivedOrdersView,
+    MpesaSTKPushView,
+    PaymentStatusView,
+    mpesa_callback,
     featured_shops,
     
 )
@@ -88,6 +91,22 @@ urlpatterns = [
     path(
         'owner/orders/',
         OwnerOrderListView.as_view()
+    ),
+
+    # 💳 MPESA PAYMENTS
+    path(
+        'orders/<int:order_id>/pay/',
+        MpesaSTKPushView.as_view()
+    ),
+
+    path(
+        'orders/<int:order_id>/payment-status/',
+        PaymentStatusView.as_view()
+    ),
+
+    path(
+        'mpesa/callback/',
+        mpesa_callback
     ),
 
     # ✅ OWNER ARCHIVED ORDERS — must come BEFORE owner/orders/<int:pk>/

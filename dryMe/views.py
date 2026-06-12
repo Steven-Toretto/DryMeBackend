@@ -13,7 +13,9 @@ from rest_framework_simplejwt.tokens import (
     RefreshToken
 )
 from django.contrib.auth import authenticate
+from django.views.decorators.csrf import csrf_exempt
 import random
+import json
 
 from .models import Order, Shop, Service
 from .serializers import (
@@ -298,6 +300,151 @@ class ShopDetailView(
             *args,
             **kwargs
         )
+
+
+# ===============================
+# 💳 MPESA STK PUSH
+# ===============================
+class MpesaSTKPushView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, order_id):
+        from .mpesa import stk_push
+
+        try:
+            order = Order.objects.get(
+                id=order_id,
+                user=request.user
+            )
+        except Order.DoesNotExist:
+            return Response(
+                {"error": "Order not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if order.payment_status == "paid":
+            return Response(
+                {"error": "Order is already paid"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        phone = request.user.phone
+        if not phone:
+            return Response(
+                {"error": "No phone number on your account. Please update your profile."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not order.total_price:
+            return Response(
+                {"error": "Order total not calculated yet"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            response = stk_push(
+                phone=phone,
+                amount=order.total_price,
+                order_id=order.id
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"M-Pesa request failed: {str(e)}"},
+                status=status.HTTP_502_BAD_GATEWAY
+            )
+
+        response_code = response.get("ResponseCode")
+
+        if response_code == "0":
+            # STK push sent successfully — mark as pending
+            order.payment_status = "pending_payment"
+            order.mpesa_checkout_request_id = response.get(
+                "CheckoutRequestID"
+            )
+            order.save()
+
+            return Response({
+                "message": "Payment prompt sent to your phone. Enter your M-Pesa PIN to complete.",
+                "checkout_request_id": response.get("CheckoutRequestID"),
+            })
+
+        else:
+            order.payment_status = "failed"
+            order.save()
+
+            return Response(
+                {"error": response.get("ResponseDescription", "STK push failed")},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+# ===============================
+# 📩 MPESA CALLBACK
+# ===============================
+@api_view(["POST"])
+@permission_classes([AllowAny])
+@csrf_exempt
+def mpesa_callback(request):
+    try:
+        body = request.data
+        callback = body["Body"]["stkCallback"]
+        result_code = callback["ResultCode"]
+        checkout_request_id = callback["CheckoutRequestID"]
+
+        try:
+            order = Order.objects.get(
+                mpesa_checkout_request_id=checkout_request_id
+            )
+        except Order.DoesNotExist:
+            return Response({"status": "ok"})
+
+        if result_code == 0:
+            # ✅ Payment successful
+            metadata = callback["CallbackMetadata"]["Item"]
+            transaction_code = next(
+                (item["Value"] for item in metadata if item["Name"] == "MpesaReceiptNumber"),
+                None
+            )
+
+            order.payment_status = "paid"
+            order.mpesa_transaction_code = transaction_code
+            order.save()
+
+        else:
+            # ❌ Payment failed or cancelled
+            order.payment_status = "failed"
+            order.save()
+
+    except Exception as e:
+        pass
+
+    # Always return 200 to Safaricom
+    return Response({"status": "ok"})
+
+
+# ===============================
+# ✅ CHECK PAYMENT STATUS
+# ===============================
+class PaymentStatusView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, order_id):
+        try:
+            order = Order.objects.get(
+                id=order_id,
+                user=request.user
+            )
+        except Order.DoesNotExist:
+            return Response(
+                {"error": "Order not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        return Response({
+            "payment_status": order.payment_status,
+            "mpesa_transaction_code": order.mpesa_transaction_code,
+            "total_price": order.total_price,
+        })
 
 
 # ===============================
@@ -686,5 +833,4 @@ class ArchivedOrdersView(
             ).order_by("-created_at")
 
         return Order.objects.none()
-
 

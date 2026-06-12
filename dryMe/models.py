@@ -176,6 +176,34 @@ class Order(models.Model):
         null=True,
     )
 
+    # 💳 Payment status
+    PAYMENT_STATUS_CHOICES = (
+        ("unpaid", "Unpaid"),
+        ("pending_payment", "Pending Payment"),
+        ("paid", "Paid"),
+        ("failed", "Failed"),
+    )
+
+    payment_status = models.CharField(
+        max_length=20,
+        choices=PAYMENT_STATUS_CHOICES,
+        default="unpaid",
+    )
+
+    # M-Pesa checkout request ID for tracking
+    mpesa_checkout_request_id = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+    )
+
+    # M-Pesa transaction code after successful payment
+    mpesa_transaction_code = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+    )
+
     # 🚦 Order status
     status = models.CharField(
         max_length=20,

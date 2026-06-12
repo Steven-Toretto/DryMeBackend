@@ -193,6 +193,18 @@ REST_FRAMEWORK = {
 
 
 # ===============================
+# 💳 MPESA
+# ===============================
+MPESA_CONSUMER_KEY = os.environ.get("MPESA_CONSUMER_KEY", "")
+MPESA_CONSUMER_SECRET = os.environ.get("MPESA_CONSUMER_SECRET", "")
+MPESA_SHORTCODE = os.environ.get("MPESA_SHORTCODE", "174379")
+MPESA_PASSKEY = os.environ.get("MPESA_PASSKEY", "")
+MPESA_CALLBACK_URL = os.environ.get(
+    "MPESA_CALLBACK_URL",
+    "https://drymebackend-2.onrender.com/api/mpesa/callback/"
+)
+
+# ===============================
 # JWT
 # ===============================
 SIMPLE_JWT = {
@@ -257,5 +269,3 @@ USE_TZ = True
 # DEFAULT PRIMARY KEY
 # ===============================
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-
-
