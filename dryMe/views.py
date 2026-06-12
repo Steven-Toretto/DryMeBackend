@@ -348,6 +348,9 @@ class MpesaSTKPushView(APIView):
                 order_id=order.id
             )
         except Exception as e:
+            import traceback
+            print("[MPESA ERROR]", str(e))
+            print("[MPESA TRACEBACK]", traceback.format_exc())
             return Response(
                 {"error": f"M-Pesa request failed: {str(e)}"},
                 status=status.HTTP_502_BAD_GATEWAY
