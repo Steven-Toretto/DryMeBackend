@@ -58,7 +58,6 @@ class RegisterSerializer(serializers.ModelSerializer):
             password=validated_data["password"],
         )
 
-        # Explicitly set all fields and save once
         user.email = email
         user.username = validated_data["username"]
         user.role = validated_data.get("role", "customer")
@@ -111,43 +110,25 @@ class ShopSerializer(serializers.ModelSerializer):
             "image",
         )
 
-    # ===========================
-    # FULL IMAGE URL
-    # ===========================
     def to_representation(self, instance):
 
-        representation = super().to_representation(
-            instance
-        )
-
+        representation = super().to_representation(instance)
         request = self.context.get("request")
 
         if instance.image:
-
             try:
-
                 image_url = instance.image.url
 
-                # CLOUDINARY
                 if image_url.startswith("http"):
-
                     representation["image"] = image_url
-
-                # LOCAL MEDIA
                 elif request:
-
                     representation["image"] = (
-                        request.build_absolute_uri(
-                            image_url
-                        )
+                        request.build_absolute_uri(image_url)
                     )
-
                 else:
-
                     representation["image"] = image_url
 
             except Exception:
-
                 representation["image"] = None
 
         return representation
@@ -177,17 +158,9 @@ class OrderSerializer(serializers.ModelSerializer):
     # ===========================
     # READ FIELDS
     # ===========================
-    user = UserSerializer(
-        read_only=True
-    )
-
-    shop = ShopSerializer(
-        read_only=True
-    )
-
-    service = ServiceSerializer(
-        read_only=True
-    )
+    user = UserSerializer(read_only=True)
+    shop = ShopSerializer(read_only=True)
+    service = ServiceSerializer(read_only=True)
 
     # ===========================
     # WRITE FIELDS
@@ -207,24 +180,20 @@ class OrderSerializer(serializers.ModelSerializer):
     # ===========================
     # SNAPSHOT FIELDS
     # ===========================
-    customer_phone = serializers.CharField(
-        read_only=True
-    )
-
-    customer_location = serializers.CharField(
-        read_only=True
-    )
+    customer_phone = serializers.CharField(read_only=True)
+    customer_location = serializers.CharField(read_only=True)
 
     # ===========================
     # ARCHIVE FIELDS
     # ===========================
-    customer_archived = serializers.BooleanField(
-        read_only=True
-    )
+    customer_archived = serializers.BooleanField(read_only=True)
+    owner_archived = serializers.BooleanField(read_only=True)
 
-    owner_archived = serializers.BooleanField(
-        read_only=True
-    )
+    # ===========================
+    # PAYMENT FIELDS
+    # ===========================
+    payment_status = serializers.CharField(read_only=True)
+    mpesa_transaction_code = serializers.CharField(read_only=True)
 
     class Meta:
         model = Order
@@ -244,7 +213,6 @@ class OrderSerializer(serializers.ModelSerializer):
             "weight",
             "total_price",
             "status",
-            
 
             # SNAPSHOT
             "customer_phone",
@@ -254,6 +222,10 @@ class OrderSerializer(serializers.ModelSerializer):
             "customer_archived",
             "owner_archived",
 
+            # PAYMENT
+            "payment_status",
+            "mpesa_transaction_code",
+
             "created_at",
         ]
 
@@ -261,16 +233,27 @@ class OrderSerializer(serializers.ModelSerializer):
             "user",
             "total_price",
             "status",
-            
             "customer_phone",
             "customer_location",
             "customer_archived",
             "owner_archived",
+            "payment_status",
+            "mpesa_transaction_code",
             "created_at",
         ]
 
     # ===========================
-    # VALIDATE SERVICE
+    # VALIDATE WEIGHT
+    # ===========================
+    def validate_weight(self, value):
+        if value <= 0:
+            raise serializers.ValidationError(
+                "Weight must be greater than 0."
+            )
+        return value
+
+    # ===========================
+    # VALIDATE SERVICE BELONGS TO SHOP
     # ===========================
     def validate(self, data):
 
@@ -278,9 +261,7 @@ class OrderSerializer(serializers.ModelSerializer):
         service = data.get("service")
 
         if shop and service:
-
             if service.shop != shop:
-
                 raise serializers.ValidationError(
                     "Selected service does not belong to this shop"
                 )
