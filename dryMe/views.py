@@ -15,7 +15,6 @@ from rest_framework_simplejwt.tokens import (
 from django.contrib.auth import authenticate
 from django.views.decorators.csrf import csrf_exempt
 import random
-import json
 
 from .models import Order, Shop, Service
 from .serializers import (
@@ -309,17 +308,7 @@ class MpesaSTKPushView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, order_id):
-        print("[PAY] View hit - order_id:", order_id)
-
-        try:
-            from .mpesa import stk_push
-            print("[PAY] mpesa imported successfully")
-        except Exception as import_err:
-            print("[PAY] mpesa import FAILED:", str(import_err))
-            return Response(
-                {"error": f"Import error: {str(import_err)}"},
-                status=status.HTTP_502_BAD_GATEWAY
-            )
+        from .mpesa import stk_push
 
         try:
             order = Order.objects.get(
@@ -358,25 +347,18 @@ class MpesaSTKPushView(APIView):
                 order_id=order.id
             )
         except Exception as e:
-            import traceback
-            print("[MPESA ERROR]", str(e))
-            print("[MPESA TRACEBACK]", traceback.format_exc())
             return Response(
                 {"error": f"M-Pesa request failed: {str(e)}"},
                 status=status.HTTP_502_BAD_GATEWAY
             )
 
-        # Log full Safaricom response for debugging
-        print("[MPESA RESPONSE]", response)
-
         response_code = response.get("ResponseCode")
 
         if response_code == "0":
-            # STK push sent successfully — mark as pending
+            # ✅ STK push sent — reset status and store checkout ID
             order.payment_status = "pending_payment"
-            order.mpesa_checkout_request_id = response.get(
-                "CheckoutRequestID"
-            )
+            order.mpesa_checkout_request_id = response.get("CheckoutRequestID")
+            order.mpesa_transaction_code = None
             order.save()
 
             return Response({
@@ -421,7 +403,6 @@ def mpesa_callback(request):
                 (item["Value"] for item in metadata if item["Name"] == "MpesaReceiptNumber"),
                 None
             )
-
             order.payment_status = "paid"
             order.mpesa_transaction_code = transaction_code
             order.save()
@@ -431,7 +412,7 @@ def mpesa_callback(request):
             order.payment_status = "failed"
             order.save()
 
-    except Exception as e:
+    except Exception:
         pass
 
     # Always return 200 to Safaricom
