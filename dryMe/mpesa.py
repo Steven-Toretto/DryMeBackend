@@ -48,10 +48,10 @@ def stk_push(phone, amount, order_id):
         "BusinessShortCode": settings.MPESA_SHORTCODE,
         "Password": password,
         "Timestamp": timestamp,
-        "TransactionType": "CustomerBuyGoodsOnline",
+        "TransactionType": "CustomerPayBillOnline",
         "Amount": int(amount),
         "PartyA": phone,
-        "PartyB": "600000",  # Sandbox till PartyB
+        "PartyB": settings.MPESA_SHORTCODE,
         "PhoneNumber": phone,
         "CallBackURL": settings.MPESA_CALLBACK_URL,
         "AccountReference": str(order_id),
