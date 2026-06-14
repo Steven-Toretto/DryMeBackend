@@ -62,6 +62,15 @@ class LoginView(APIView):
     authentication_classes = []
 
     def post(self, request):
+        import traceback
+        try:
+            return self._post(request)
+        except Exception as e:
+            print("[LOGIN 500]", str(e))
+            print("[LOGIN TRACEBACK]", traceback.format_exc())
+            raise
+
+    def _post(self, request):
 
         email = request.data.get("email", "").strip().lower()
         password = request.data.get("password")
