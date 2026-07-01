@@ -134,14 +134,17 @@ class ShopListCreateView(
 ):
 
     serializer_class = ShopSerializer
-    permission_classes = [
-        IsAuthenticated
-    ]
-
     parser_classes = (
         parsers.MultiPartParser,
         parsers.FormParser,
     )
+
+    def get_permissions(self):
+        # ✅ GET is public — anyone can browse shops
+        # POST requires authentication (owners only)
+        if self.request.method == "GET":
+            return [AllowAny()]
+        return [IsAuthenticated()]
 
     # =========================
     # GET SHOPS
@@ -150,26 +153,14 @@ class ShopListCreateView(
 
         user = self.request.user
 
-        if not user.is_authenticated:
-            return Shop.objects.none()
-
-        role = getattr(
-            user,
-            "role",
-            "customer"
-        )
-
-        # OWNERS SEE THEIR SHOPS
-        if role == "owner":
-
+        # OWNERS SEE ONLY THEIR OWN SHOPS
+        if user.is_authenticated and getattr(user, "role", "customer") == "owner":
             return Shop.objects.filter(
                 owner=user
             ).order_by("-id")
 
-        # CUSTOMERS SEE ALL SHOPS
-        return Shop.objects.all().order_by(
-            "-id"
-        )
+        # GUESTS AND CUSTOMERS SEE ALL SHOPS
+        return Shop.objects.all().order_by("-id")
 
     # =========================
     # SERIALIZER CONTEXT
@@ -221,11 +212,14 @@ class ShopDetailView(
 ):
 
     serializer_class = ShopSerializer
-    permission_classes = [
-        IsAuthenticated
-    ]
-
     queryset = Shop.objects.all()
+
+    def get_permissions(self):
+        # ✅ GET is public — anyone can view a shop detail
+        # PUT/PATCH/DELETE requires authentication
+        if self.request.method == "GET":
+            return [AllowAny()]
+        return [IsAuthenticated()]
 
     parser_classes = [
         parsers.MultiPartParser,
@@ -504,7 +498,7 @@ class ServiceListCreateView(
 
     def get_queryset(self):
 
-        queryset = Service.objects.all()
+        queryset = Service.objects.all().order_by("id")
 
         shop_id = self.request.query_params.get(
             "shop"
@@ -840,36 +834,3 @@ class ArchivedOrdersView(
 
         return Order.objects.none()
 
-
-# ===============================
-# 🔧 TEMP: CREATE SUPERUSER
-# ===============================
-@api_view(["GET"])
-@permission_classes([AllowAny])
-def create_superuser(request):
-    from django.contrib.auth import get_user_model
-    User = get_user_model()
-
-    # Delete old attempt
-    User.objects.filter(email="admin@dryme.com").delete()
-
-    user = User(
-        email="admin@dryme.com",
-        username="admin",
-        role="owner",
-        is_staff=True,
-        is_superuser=True,
-        is_active=True,
-    )
-    user.set_password("AdminDryMe2026!")
-    user.save()
-
-    # Verify it was saved correctly
-    saved = User.objects.get(email="admin@dryme.com")
-    return Response({
-        "email": saved.email,
-        "is_staff": saved.is_staff,
-        "is_superuser": saved.is_superuser,
-        "is_active": saved.is_active,
-        "has_usable_password": saved.has_usable_password(),
-    })
