@@ -18,7 +18,7 @@ from .views import (
     PaymentStatusView,
     mpesa_callback,
     featured_shops,
-    create_superuser,
+    
 )
 
 urlpatterns = [
@@ -115,11 +115,7 @@ urlpatterns = [
         ArchivedOrdersView.as_view()
     ),
 
-    # 🔧 TEMP: CREATE SUPERUSER — REMOVE AFTER USE
-    path(
-        'create-superuser/',
-        create_superuser
-    ),
+    
 
 ]
 
