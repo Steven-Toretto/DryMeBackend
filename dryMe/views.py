@@ -708,12 +708,20 @@ class UpdateOrderStatusView(
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        from django.utils import timezone
+
         order.status = new_status
+
+        # ⏱️ Auto-set timestamps when status changes
+        if new_status == "washing" and not order.washing_at:
+            order.washing_at = timezone.now()
+        elif new_status == "completed" and not order.completed_at:
+            order.completed_at = timezone.now()
+
         order.save()
 
         return Response({
-            "message":
-            "Order status updated"
+            "message": "Order status updated"
         })
 
 
@@ -833,4 +841,6 @@ class ArchivedOrdersView(
             ).order_by("-created_at")
 
         return Order.objects.none()
+
+
 

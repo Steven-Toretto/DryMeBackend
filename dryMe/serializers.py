@@ -195,6 +195,12 @@ class OrderSerializer(serializers.ModelSerializer):
     payment_status = serializers.CharField(read_only=True)
     mpesa_transaction_code = serializers.CharField(read_only=True)
 
+    # ===========================
+    # TIMELINE FIELDS
+    # ===========================
+    washing_at = serializers.DateTimeField(read_only=True)
+    completed_at = serializers.DateTimeField(read_only=True)
+
     class Meta:
         model = Order
 
@@ -226,7 +232,10 @@ class OrderSerializer(serializers.ModelSerializer):
             "payment_status",
             "mpesa_transaction_code",
 
+            # TIMELINE
             "created_at",
+            "washing_at",
+            "completed_at",
         ]
 
         read_only_fields = [
@@ -240,6 +249,8 @@ class OrderSerializer(serializers.ModelSerializer):
             "payment_status",
             "mpesa_transaction_code",
             "created_at",
+            "washing_at",
+            "completed_at",
         ]
 
     # ===========================
@@ -283,3 +294,5 @@ class OrderSerializer(serializers.ModelSerializer):
         )
 
         return order
+
+
