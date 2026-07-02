@@ -163,6 +163,12 @@ class Order(models.Model):
         null=True,
     )
 
+    # 📝 Customer notes (gate code, stain alerts, instructions)
+    customer_notes = models.TextField(
+        blank=True,
+        null=True,
+    )
+
     # 📞 Customer snapshot at time of order
     customer_phone = models.CharField(
         max_length=15,
@@ -254,7 +260,6 @@ class Order(models.Model):
             f"{self.service.name} "
             f"({self.status})"
         )
-
 
 
 # import os
@@ -474,7 +479,18 @@ class Order(models.Model):
 #     customer_archived = models.BooleanField(default=False)
 #     owner_archived = models.BooleanField(default=False)
 
+#     # ⏱️ Timeline timestamps
 #     created_at = models.DateTimeField(auto_now_add=True)
+
+#     washing_at = models.DateTimeField(
+#         blank=True,
+#         null=True,
+#     )
+
+#     completed_at = models.DateTimeField(
+#         blank=True,
+#         null=True,
+#     )
 
 #     class Meta:
 #         ordering = ["-created_at"]
@@ -502,3 +518,5 @@ class Order(models.Model):
 #             f"{self.service.name} "
 #             f"({self.status})"
 #         )
+
+
