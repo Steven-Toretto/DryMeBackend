@@ -726,6 +726,34 @@ class UpdateOrderStatusView(
 
 
 # ===============================
+# 📝 UPDATE ORDER NOTES
+# ===============================
+class UpdateOrderNotesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, pk):
+        try:
+            order = Order.objects.get(
+                id=pk,
+                user=request.user
+            )
+        except Order.DoesNotExist:
+            return Response(
+                {"error": "Order not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        notes = request.data.get("notes", "")
+        order.customer_notes = notes
+        order.save()
+
+        return Response({
+            "message": "Notes updated",
+            "notes": order.customer_notes,
+        })
+
+
+# ===============================
 # 📁 ARCHIVE ORDER
 # ===============================
 class ArchiveOrderView(APIView):
@@ -841,6 +869,7 @@ class ArchivedOrdersView(
             ).order_by("-created_at")
 
         return Order.objects.none()
+
 
 
 

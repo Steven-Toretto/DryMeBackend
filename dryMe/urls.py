@@ -12,13 +12,13 @@ from .views import (
     OrderListCreateView,
     OwnerOrderListView,
     UpdateOrderStatusView,
+    UpdateOrderNotesView,
     ArchiveOrderView,
     ArchivedOrdersView,
     MpesaSTKPushView,
     PaymentStatusView,
     mpesa_callback,
     featured_shops,
-    
 )
 
 urlpatterns = [
@@ -79,6 +79,12 @@ urlpatterns = [
     path(
         'orders/<int:pk>/status/',
         UpdateOrderStatusView.as_view()
+    ),
+
+    # 📝 UPDATE ORDER NOTES
+    path(
+        'orders/<int:pk>/notes/',
+        UpdateOrderNotesView.as_view()
     ),
 
     # 📁 ARCHIVE ORDER
