@@ -129,8 +129,10 @@ class Order(models.Model):
 
     STATUS_CHOICES = (
         ("pending", "Pending"),
+        ("confirmed", "Confirmed"),
         ("washing", "Washing"),
         ("completed", "Completed"),
+        ("declined", "Declined"),
     )
 
     user = models.ForeignKey(
@@ -217,6 +219,16 @@ class Order(models.Model):
         default="pending",
     )
 
+    # ❌ Why the owner declined the order (required when status="declined")
+    decline_reason = models.TextField(
+        blank=True,
+        null=True,
+    )
+
+    # 💸 Flags a declined order that was already paid, so the owner
+    # knows to issue a manual M-Pesa refund
+    refund_needed = models.BooleanField(default=False)
+
     # 📁 Archive flags (independent per role)
     customer_archived = models.BooleanField(default=False)
     owner_archived = models.BooleanField(default=False)
@@ -224,12 +236,22 @@ class Order(models.Model):
     # ⏱️ Timeline timestamps
     created_at = models.DateTimeField(auto_now_add=True)
 
+    confirmed_at = models.DateTimeField(
+        blank=True,
+        null=True,
+    )
+
     washing_at = models.DateTimeField(
         blank=True,
         null=True,
     )
 
     completed_at = models.DateTimeField(
+        blank=True,
+        null=True,
+    )
+
+    declined_at = models.DateTimeField(
         blank=True,
         null=True,
     )
@@ -518,5 +540,4 @@ class Order(models.Model):
 #             f"{self.service.name} "
 #             f"({self.status})"
 #         )
-
 

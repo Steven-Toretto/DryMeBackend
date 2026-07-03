@@ -203,8 +203,16 @@ class OrderSerializer(serializers.ModelSerializer):
     # ===========================
     # TIMELINE FIELDS
     # ===========================
+    confirmed_at = serializers.DateTimeField(read_only=True)
     washing_at = serializers.DateTimeField(read_only=True)
     completed_at = serializers.DateTimeField(read_only=True)
+    declined_at = serializers.DateTimeField(read_only=True)
+
+    # ===========================
+    # DECLINE FIELDS
+    # ===========================
+    decline_reason = serializers.CharField(read_only=True)
+    refund_needed = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Order
@@ -238,10 +246,16 @@ class OrderSerializer(serializers.ModelSerializer):
             "payment_status",
             "mpesa_transaction_code",
 
+            # DECLINE
+            "decline_reason",
+            "refund_needed",
+
             # TIMELINE
             "created_at",
+            "confirmed_at",
             "washing_at",
             "completed_at",
+            "declined_at",
         ]
 
         read_only_fields = [
@@ -254,9 +268,13 @@ class OrderSerializer(serializers.ModelSerializer):
             "owner_archived",
             "payment_status",
             "mpesa_transaction_code",
+            "decline_reason",
+            "refund_needed",
             "created_at",
+            "confirmed_at",
             "washing_at",
             "completed_at",
+            "declined_at",
         ]
 
     # ===========================
@@ -601,5 +619,3 @@ class OrderSerializer(serializers.ModelSerializer):
 #         )
 
 #         return order
-
-
