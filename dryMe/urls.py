@@ -5,6 +5,8 @@ from django.conf.urls.static import static
 from .views import (
     RegisterView,
     LoginView,
+    ProfileView,
+    ChangePasswordView,
     ShopListCreateView,
     ShopDetailView,
     ServiceListCreateView,
@@ -34,6 +36,17 @@ urlpatterns = [
     path(
         'login/',
         LoginView.as_view()
+    ),
+
+    # 👤 PROFILE
+    path(
+        'profile/',
+        ProfileView.as_view()
+    ),
+
+    path(
+        'profile/change-password/',
+        ChangePasswordView.as_view()
     ),
 
     # 🏪 SHOPS
@@ -144,3 +157,5 @@ if settings.DEBUG:
         settings.MEDIA_URL,
         document_root=settings.MEDIA_ROOT
     )
+
+    

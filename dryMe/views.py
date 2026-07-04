@@ -13,7 +13,10 @@ from rest_framework_simplejwt.tokens import (
     RefreshToken
 )
 from django.contrib.auth import authenticate
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.views.decorators.csrf import csrf_exempt
+from django.db.models import Sum
 import random
 
 from .models import Order, Shop, Service
@@ -21,7 +24,8 @@ from .serializers import (
     ShopSerializer,
     ServiceSerializer,
     OrderSerializer,
-    RegisterSerializer
+    RegisterSerializer,
+    ProfileSerializer,
 )
 
 # ===============================
@@ -124,6 +128,107 @@ class LoginView(APIView):
             ),
             "username": user.username
         })
+
+
+# ===============================
+# 📊 PROFILE STATS HELPER
+# ===============================
+def build_profile_stats(user):
+
+    if user.role == "owner":
+
+        orders = Order.objects.filter(shop__owner=user)
+
+        revenue = orders.filter(
+            status="completed"
+        ).aggregate(total=Sum("total_price"))["total"] or 0
+
+        return {
+            "shops_count": Shop.objects.filter(owner=user).count(),
+            "total_orders": orders.count(),
+            "active_orders": orders.filter(
+                status__in=["pending", "confirmed", "washing"]
+            ).count(),
+            "completed_orders": orders.filter(status="completed").count(),
+            "declined_orders": orders.filter(status="declined").count(),
+            "revenue": revenue,
+        }
+
+    orders = Order.objects.filter(user=user)
+
+    total_spent = orders.filter(
+        payment_status="paid"
+    ).aggregate(total=Sum("total_price"))["total"] or 0
+
+    return {
+        "total_orders": orders.count(),
+        "active_orders": orders.filter(
+            status__in=["pending", "confirmed", "washing"]
+        ).count(),
+        "completed_orders": orders.filter(status="completed").count(),
+        "cancelled_orders": orders.filter(
+            status__in=["cancelled", "declined"]
+        ).count(),
+        "total_spent": total_spent,
+    }
+
+
+# ===============================
+# 👤 PROFILE (VIEW + UPDATE)
+# ===============================
+class ProfileView(generics.RetrieveUpdateAPIView):
+
+    serializer_class = ProfileSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user
+
+    def retrieve(self, request, *args, **kwargs):
+        serializer = self.get_serializer(self.get_object())
+        data = dict(serializer.data)
+        data["stats"] = build_profile_stats(request.user)
+        return Response(data)
+
+
+# ===============================
+# 🔑 CHANGE PASSWORD
+# ===============================
+class ChangePasswordView(APIView):
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+
+        user = request.user
+
+        old_password = request.data.get("old_password", "")
+        new_password = request.data.get("new_password", "")
+
+        if not old_password or not new_password:
+            return Response(
+                {"error": "Both current and new password are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not user.check_password(old_password):
+            return Response(
+                {"error": "Current password is incorrect"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            validate_password(new_password, user=user)
+        except DjangoValidationError as e:
+            return Response(
+                {"error": " ".join(e.messages)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user.set_password(new_password)
+        user.save()
+
+        return Response({"message": "Password updated successfully"})
 
 
 # ===============================
