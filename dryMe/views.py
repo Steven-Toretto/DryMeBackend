@@ -691,10 +691,10 @@ class UpdateOrderStatusView(
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        # 🚫 Declined orders are a dead end — reactivate via a new order instead
-        if order.status == "declined":
+        # 🚫 Declined/cancelled orders are a dead end — book again instead
+        if order.status in ["declined", "cancelled"]:
             return Response(
-                {"error": "This order was declined and can no longer be updated"},
+                {"error": f"This order was {order.status} and can no longer be updated"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -762,8 +762,8 @@ class DeclineOrderView(APIView):
             )
 
         # 🚫 Can only decline before washing starts — once washing/completed/
-        # declined, it's too late to turn the order away
-        if order.status in ["washing", "completed", "declined"]:
+        # declined/cancelled, it's too late to turn the order away
+        if order.status in ["washing", "completed", "declined", "cancelled"]:
             return Response(
                 {"error": "This order can no longer be declined"},
                 status=status.HTTP_400_BAD_REQUEST
@@ -800,6 +800,57 @@ class DeclineOrderView(APIView):
             "message": "Order declined",
             "status": order.status,
             "decline_reason": order.decline_reason,
+            "refund_needed": order.refund_needed,
+        })
+
+
+# ===============================
+# 🚫 CANCEL ORDER (customer)
+# ===============================
+class CancelOrderView(APIView):
+
+    permission_classes = [
+        IsAuthenticated
+    ]
+
+    def post(self, request, pk):
+
+        try:
+            order = Order.objects.get(pk=pk)
+        except Order.DoesNotExist:
+            return Response(
+                {"error": "Order not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # ONLY THE CUSTOMER WHO PLACED IT
+        if order.user != request.user:
+            return Response(
+                {"error": "Not allowed"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # 🚫 Can only cancel before washing starts
+        if order.status in ["washing", "completed", "declined", "cancelled"]:
+            return Response(
+                {"error": "This order can no longer be cancelled"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        from django.utils import timezone
+
+        order.status = "cancelled"
+        order.cancelled_at = timezone.now()
+
+        # 💸 Flag for manual refund if the customer already paid
+        if order.payment_status == "paid":
+            order.refund_needed = True
+
+        order.save()
+
+        return Response({
+            "message": "Order cancelled",
+            "status": order.status,
             "refund_needed": order.refund_needed,
         })
 
@@ -856,13 +907,13 @@ class ArchiveOrderView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # ONLY COMPLETED ORDERS
-        if order.status != "completed":
+        # ONLY TERMINAL ORDERS — nothing left to happen to them
+        if order.status not in ["completed", "declined", "cancelled"]:
 
             return Response(
                 {
                     "error":
-                    "Only completed orders can be archived"
+                    "Only completed, declined, or cancelled orders can be archived"
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
@@ -948,4 +999,3 @@ class ArchivedOrdersView(
             ).order_by("-created_at")
 
         return Order.objects.none()
-

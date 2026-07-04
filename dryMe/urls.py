@@ -13,6 +13,7 @@ from .views import (
     OwnerOrderListView,
     UpdateOrderStatusView,
     DeclineOrderView,
+    CancelOrderView,
     UpdateOrderNotesView,
     ArchiveOrderView,
     ArchivedOrdersView,
@@ -88,6 +89,12 @@ urlpatterns = [
         DeclineOrderView.as_view()
     ),
 
+    # 🚫 CANCEL ORDER (customer)
+    path(
+        'orders/<int:pk>/cancel/',
+        CancelOrderView.as_view()
+    ),
+
     # 📝 UPDATE ORDER NOTES
     path(
         'orders/<int:pk>/notes/',
@@ -137,4 +144,3 @@ if settings.DEBUG:
         settings.MEDIA_URL,
         document_root=settings.MEDIA_ROOT
     )
-
