@@ -220,10 +220,28 @@ class OrderSerializer(serializers.ModelSerializer):
     )
 
     # ===========================
-    # SNAPSHOT FIELDS
+    # SNAPSHOT FIELDS — writable so the customer can confirm/override
+    # per order at checkout, instead of silently relying on whatever
+    # (if anything) is saved on their profile.
     # ===========================
-    customer_phone = serializers.CharField(read_only=True)
-    customer_location = serializers.CharField(read_only=True)
+    customer_phone = serializers.CharField(
+        required=True,
+        allow_blank=False,
+        max_length=15,
+        error_messages={
+            "blank": "A phone number is required so the shop can reach you.",
+            "required": "A phone number is required so the shop can reach you.",
+        },
+    )
+    customer_location = serializers.CharField(
+        required=True,
+        allow_blank=False,
+        max_length=255,
+        error_messages={
+            "blank": "A pickup location is required.",
+            "required": "A pickup location is required.",
+        },
+    )
     customer_notes = serializers.CharField(
         required=False,
         allow_blank=True,
@@ -306,8 +324,6 @@ class OrderSerializer(serializers.ModelSerializer):
             "user",
             "total_price",
             "status",
-            "customer_phone",
-            "customer_location",
             "customer_archived",
             "owner_archived",
             "payment_status",
@@ -361,7 +377,8 @@ class OrderSerializer(serializers.ModelSerializer):
             service=validated_data["service"],
             weight=validated_data["weight"],
             customer_notes=validated_data.get("customer_notes", ""),
+            customer_phone=validated_data.get("customer_phone", ""),
+            customer_location=validated_data.get("customer_location", ""),
         )
 
         return order
-

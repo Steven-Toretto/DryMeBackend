@@ -274,11 +274,15 @@ class Order(models.Model):
                 * Decimal(self.weight)
             )
 
-        # ✅ Only snapshot customer details on creation
+        # ✅ Snapshot customer details on creation — only fills in from
+        # the profile as a fallback; an explicitly provided per-order
+        # phone/location (from the booking form) always wins.
         is_new = self.pk is None
         if is_new and self.user:
-            self.customer_phone = self.user.phone
-            self.customer_location = self.user.location
+            if not self.customer_phone:
+                self.customer_phone = self.user.phone
+            if not self.customer_location:
+                self.customer_location = self.user.location
 
         super().save(*args, **kwargs)
 
@@ -288,4 +292,3 @@ class Order(models.Model):
             f"{self.service.name} "
             f"({self.status})"
         )
-
