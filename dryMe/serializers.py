@@ -248,6 +248,18 @@ class OrderSerializer(serializers.ModelSerializer):
         allow_null=True,
     )
 
+    # 📍 Optional exact GPS pin — not required, since not every browser/
+    # device will grant location permission. customer_location (text)
+    # remains the required fallback.
+    pickup_lat = serializers.FloatField(
+        required=False,
+        allow_null=True,
+    )
+    pickup_lng = serializers.FloatField(
+        required=False,
+        allow_null=True,
+    )
+
     # ===========================
     # ARCHIVE FIELDS
     # ===========================
@@ -298,6 +310,8 @@ class OrderSerializer(serializers.ModelSerializer):
             "customer_phone",
             "customer_location",
             "customer_notes",
+            "pickup_lat",
+            "pickup_lng",
 
             # ARCHIVE
             "customer_archived",
@@ -371,6 +385,9 @@ class OrderSerializer(serializers.ModelSerializer):
 
         user = self.context["request"].user
 
+        pickup_lat = validated_data.get("pickup_lat")
+        pickup_lng = validated_data.get("pickup_lng")
+
         order = Order.objects.create(
             user=user,
             shop=validated_data["shop"],
@@ -379,6 +396,11 @@ class OrderSerializer(serializers.ModelSerializer):
             customer_notes=validated_data.get("customer_notes", ""),
             customer_phone=validated_data.get("customer_phone", ""),
             customer_location=validated_data.get("customer_location", ""),
+            # Round here rather than trust the client — GPS coordinates
+            # routinely arrive with far more precision than the DB
+            # column allows (max_digits=9, decimal_places=6).
+            pickup_lat=round(pickup_lat, 6) if pickup_lat is not None else None,
+            pickup_lng=round(pickup_lng, 6) if pickup_lng is not None else None,
         )
 
         return order

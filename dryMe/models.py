@@ -185,6 +185,24 @@ class Order(models.Model):
         null=True,
     )
 
+    # 📍 Optional GPS pin — captured from the browser's geolocation at
+    # booking time. When present, this is what drivers/owners should use
+    # for directions (an exact point), with customer_location kept as a
+    # human-readable landmark/detail ("blue gate opposite Java House").
+    pickup_lat = models.DecimalField(
+        max_digits=9,
+        decimal_places=6,
+        blank=True,
+        null=True,
+    )
+
+    pickup_lng = models.DecimalField(
+        max_digits=9,
+        decimal_places=6,
+        blank=True,
+        null=True,
+    )
+
     # 💳 Payment status
     PAYMENT_STATUS_CHOICES = (
         ("unpaid", "Unpaid"),
