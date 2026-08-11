@@ -23,6 +23,8 @@ from .views import (
     PaymentStatusView,
     mpesa_callback,
     featured_shops,
+    CreateReviewView,
+    ShopReviewsView,
 )
 
 urlpatterns = [
@@ -108,6 +110,18 @@ urlpatterns = [
         CancelOrderView.as_view()
     ),
 
+    # ⭐ REVIEW (customer rates a completed order)
+    path(
+        'orders/<int:pk>/review/',
+        CreateReviewView.as_view()
+    ),
+
+    # ⭐ SHOP REVIEWS (public list)
+    path(
+        'shops/<int:pk>/reviews/',
+        ShopReviewsView.as_view()
+    ),
+
     # 📝 UPDATE ORDER NOTES
     path(
         'orders/<int:pk>/notes/',
@@ -157,5 +171,3 @@ if settings.DEBUG:
         settings.MEDIA_URL,
         document_root=settings.MEDIA_ROOT
     )
-
-    

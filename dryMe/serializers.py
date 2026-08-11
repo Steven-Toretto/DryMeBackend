@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from django.db.models import Avg
 
-from .models import Shop, Service, Order
+from .models import Shop, Service, Order, Review
 
 User = get_user_model()
 
@@ -140,6 +141,16 @@ class ShopSerializer(serializers.ModelSerializer):
         allow_null=True
     )
 
+    average_rating = serializers.SerializerMethodField()
+    review_count = serializers.SerializerMethodField()
+
+    def get_average_rating(self, obj):
+        avg = obj.reviews.aggregate(avg=Avg("rating"))["avg"]
+        return round(avg, 1) if avg is not None else None
+
+    def get_review_count(self, obj):
+        return obj.reviews.count()
+
     class Meta:
         model = Shop
 
@@ -150,6 +161,8 @@ class ShopSerializer(serializers.ModelSerializer):
             "location",
             "description",
             "image",
+            "average_rating",
+            "review_count",
         )
 
     def to_representation(self, instance):
@@ -187,7 +200,8 @@ class ServiceSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "name",
-            "price_per_kg",
+            "price",
+            "pricing_type",
             "shop",
         )
 
@@ -204,6 +218,14 @@ class OrderSerializer(serializers.ModelSerializer):
     shop = ShopSerializer(read_only=True)
     service = ServiceSerializer(read_only=True)
 
+    # Whether the customer has already left a review for this order —
+    # lets the frontend show "Rate this order" vs. the existing rating
+    # without a separate lookup.
+    has_review = serializers.SerializerMethodField()
+
+    def get_has_review(self, obj):
+        return hasattr(obj, "review")
+
     # ===========================
     # WRITE FIELDS
     # ===========================
@@ -217,6 +239,23 @@ class OrderSerializer(serializers.ModelSerializer):
         queryset=Service.objects.all(),
         source="service",
         write_only=True
+    )
+
+    # ===========================
+    # WEIGHT / QUANTITY — exactly one is required, depending on the
+    # selected service's pricing_type. Enforced in validate() below,
+    # since the right answer depends on which service was picked.
+    # ===========================
+    weight = serializers.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        required=False,
+        allow_null=True,
+    )
+    quantity = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        min_value=1,
     )
 
     # ===========================
@@ -303,6 +342,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "service_id",
 
             "weight",
+            "quantity",
             "total_price",
             "status",
 
@@ -332,6 +372,9 @@ class OrderSerializer(serializers.ModelSerializer):
             "completed_at",
             "declined_at",
             "cancelled_at",
+
+            # REVIEW
+            "has_review",
         ]
 
         read_only_fields = [
@@ -379,6 +422,26 @@ class OrderSerializer(serializers.ModelSerializer):
         return data
 
     # ===========================
+    # VALIDATE — weight vs quantity depends on the chosen service
+    # ===========================
+    def validate(self, attrs):
+        service = attrs.get("service")
+
+        if service:
+            if service.pricing_type == "per_item":
+                if not attrs.get("quantity"):
+                    raise serializers.ValidationError({
+                        "quantity": "This service is priced per item — specify how many.",
+                    })
+            elif service.pricing_type == "per_kg":
+                if not attrs.get("weight"):
+                    raise serializers.ValidationError({
+                        "weight": "This service is priced by weight — specify how much.",
+                    })
+
+        return attrs
+
+    # ===========================
     # CREATE ORDER
     # ===========================
     def create(self, validated_data):
@@ -392,7 +455,8 @@ class OrderSerializer(serializers.ModelSerializer):
             user=user,
             shop=validated_data["shop"],
             service=validated_data["service"],
-            weight=validated_data["weight"],
+            weight=validated_data.get("weight"),
+            quantity=validated_data.get("quantity"),
             customer_notes=validated_data.get("customer_notes", ""),
             customer_phone=validated_data.get("customer_phone", ""),
             customer_location=validated_data.get("customer_location", ""),
@@ -404,3 +468,45 @@ class OrderSerializer(serializers.ModelSerializer):
         )
 
         return order
+
+
+# ===============================
+# ⭐ REVIEW SERIALIZER
+# ===============================
+class ReviewSerializer(serializers.ModelSerializer):
+
+    username = serializers.CharField(
+        source="user.username",
+        read_only=True,
+    )
+
+    class Meta:
+        model = Review
+
+        fields = (
+            "id",
+            "shop",
+            "order",
+            "username",
+            "rating",
+            "comment",
+            "created_at",
+        )
+
+        read_only_fields = (
+            "id",
+            "shop",
+            "order",
+            "username",
+            "created_at",
+        )
+
+    def validate_rating(self, value):
+        if value < 1 or value > 5:
+            raise serializers.ValidationError("Rating must be between 1 and 5.")
+        return value
+
+    def validate_comment(self, value):
+        if value and len(value) > 1000:
+            raise serializers.ValidationError("Comment is too long.")
+        return value

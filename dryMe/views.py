@@ -19,13 +19,14 @@ from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Sum
 import random
 
-from .models import Order, Shop, Service
+from .models import Order, Shop, Service, Review
 from .serializers import (
     ShopSerializer,
     ServiceSerializer,
     OrderSerializer,
     RegisterSerializer,
     ProfileSerializer,
+    ReviewSerializer,
 )
 
 # ===============================
@@ -958,6 +959,94 @@ class CancelOrderView(APIView):
             "status": order.status,
             "refund_needed": order.refund_needed,
         })
+
+
+# ===============================
+# ⭐ CREATE REVIEW (for a completed order)
+# ===============================
+class CreateReviewView(APIView):
+
+    permission_classes = [
+        IsAuthenticated
+    ]
+
+    def post(self, request, pk):
+
+        try:
+            order = Order.objects.get(pk=pk)
+        except Order.DoesNotExist:
+            return Response(
+                {"error": "Order not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # ONLY THE CUSTOMER WHO PLACED IT
+        if order.user != request.user:
+            return Response(
+                {"error": "Not allowed"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # 🚫 Can only review an order the shop actually completed
+        if order.status != "completed":
+            return Response(
+                {"error": "You can only review an order after it's completed"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 🚫 One review per order
+        if hasattr(order, "review"):
+            return Response(
+                {"error": "You've already reviewed this order"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        rating = request.data.get("rating")
+        comment = request.data.get("comment", "")
+
+        if rating is None:
+            return Response(
+                {"error": "A rating is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            rating = int(rating)
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "Rating must be a number from 1 to 5"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if rating < 1 or rating > 5:
+            return Response(
+                {"error": "Rating must be between 1 and 5"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        review = Review.objects.create(
+            order=order,
+            shop=order.shop,
+            user=request.user,
+            rating=rating,
+            comment=comment.strip() if isinstance(comment, str) else "",
+        )
+
+        serializer = ReviewSerializer(review)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+# ===============================
+# ⭐ LIST REVIEWS FOR A SHOP (public)
+# ===============================
+class ShopReviewsView(generics.ListAPIView):
+
+    serializer_class = ReviewSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        shop_id = self.kwargs["pk"]
+        return Review.objects.filter(shop_id=shop_id).select_related("user")
 
 
 # ===============================

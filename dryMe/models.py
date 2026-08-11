@@ -113,7 +113,23 @@ class Service(models.Model):
 
     name = models.CharField(max_length=100)
 
-    price_per_kg = models.DecimalField(
+    # 💲 How this service is priced. "per_kg" — regular wash/dry-clean
+    # by weight. "per_item" — suits, duvets, curtains, anything priced
+    # per piece rather than by weight.
+    PRICING_TYPE_CHOICES = (
+        ("per_kg", "Per Kg"),
+        ("per_item", "Per Item"),
+    )
+
+    pricing_type = models.CharField(
+        max_length=10,
+        choices=PRICING_TYPE_CHOICES,
+        default="per_kg",
+    )
+
+    # Price per kg (if pricing_type="per_kg") or price per item
+    # (if pricing_type="per_item") — same field, meaning depends on type.
+    price = models.DecimalField(
         max_digits=10,
         decimal_places=2,
     )
@@ -156,6 +172,15 @@ class Order(models.Model):
     weight = models.DecimalField(
         max_digits=5,
         decimal_places=2,
+        blank=True,
+        null=True,
+    )
+
+    # Used instead of weight when the service is priced per item
+    # (e.g. "3 suits").
+    quantity = models.PositiveIntegerField(
+        blank=True,
+        null=True,
     )
 
     # 💰 Auto-calculated total
@@ -285,12 +310,19 @@ class Order(models.Model):
 
     def save(self, *args, **kwargs):
 
-        # ✅ Always recalculate total price
-        if self.service and self.weight:
-            self.total_price = (
-                Decimal(self.service.price_per_kg)
-                * Decimal(self.weight)
-            )
+        # ✅ Always recalculate total price — how depends on how this
+        # service is priced.
+        if self.service:
+            if self.service.pricing_type == "per_item" and self.quantity:
+                self.total_price = (
+                    Decimal(self.service.price)
+                    * Decimal(self.quantity)
+                )
+            elif self.service.pricing_type == "per_kg" and self.weight:
+                self.total_price = (
+                    Decimal(self.service.price)
+                    * Decimal(self.weight)
+                )
 
         # ✅ Snapshot customer details on creation — only fills in from
         # the profile as a fallback; an explicitly provided per-order
@@ -310,3 +342,48 @@ class Order(models.Model):
             f"{self.service.name} "
             f"({self.status})"
         )
+
+
+# =============================
+# ⭐ REVIEW MODEL
+# =============================
+class Review(models.Model):
+
+    # One review per completed order — this is what ties eligibility
+    # ("did you actually get laundry back from this shop") to the
+    # ability to review at all, and stops one order being reviewed twice.
+    order = models.OneToOneField(
+        Order,
+        on_delete=models.CASCADE,
+        related_name="review",
+    )
+
+    shop = models.ForeignKey(
+        Shop,
+        on_delete=models.CASCADE,
+        related_name="reviews",
+    )
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="reviews",
+    )
+
+    rating = models.PositiveSmallIntegerField(
+        choices=[(i, str(i)) for i in range(1, 6)],
+    )
+
+    comment = models.TextField(
+        max_length=1000,
+        blank=True,
+        null=True,
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.user.username} rated {self.shop.name} {self.rating}★"

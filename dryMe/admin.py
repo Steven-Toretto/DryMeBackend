@@ -3,7 +3,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.forms import UserChangeForm, UserCreationForm
 from django import forms
 
-from .models import User, Shop, Service, Order
+from .models import User, Shop, Service, Order, Review
 
 
 # ===============================
@@ -114,7 +114,7 @@ class ShopAdmin(admin.ModelAdmin):
 # ===============================
 @admin.register(Service)
 class ServiceAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "shop", "price_per_kg")
+    list_display = ("id", "name", "shop", "pricing_type", "price")
     list_filter = ("shop",)
     search_fields = ("name", "shop__name")
     ordering = ("id",)
@@ -137,4 +137,15 @@ class OrderAdmin(admin.ModelAdmin):
     )
     list_filter = ("status", "shop")
     search_fields = ("user__username", "user__email", "shop__name")
+    ordering = ("-created_at",)
+
+
+# ===============================
+# ⭐ REVIEW ADMIN
+# ===============================
+@admin.register(Review)
+class ReviewAdmin(admin.ModelAdmin):
+    list_display = ("id", "shop", "user", "rating", "created_at")
+    list_filter = ("rating", "shop")
+    search_fields = ("shop__name", "user__username", "comment")
     ordering = ("-created_at",)
