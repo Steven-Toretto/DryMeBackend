@@ -85,6 +85,13 @@ class Shop(models.Model):
     location = models.CharField(max_length=255)
     description = models.TextField()
 
+    # 📍 Exact GPS pin for the shop itself — lets customers see and
+    # navigate to the real spot instead of just a typed neighborhood
+    # name. FloatField (not DecimalField) deliberately, to avoid the
+    # same over-precision rejection bug we hit with Order.pickup_lat/lng.
+    lat = models.FloatField(blank=True, null=True)
+    lng = models.FloatField(blank=True, null=True)
+
     image = models.ImageField(
         upload_to=shop_image_upload,
         blank=True,

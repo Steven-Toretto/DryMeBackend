@@ -141,6 +141,9 @@ class ShopSerializer(serializers.ModelSerializer):
         allow_null=True
     )
 
+    lat = serializers.FloatField(required=False, allow_null=True)
+    lng = serializers.FloatField(required=False, allow_null=True)
+
     average_rating = serializers.SerializerMethodField()
     review_count = serializers.SerializerMethodField()
 
@@ -161,6 +164,8 @@ class ShopSerializer(serializers.ModelSerializer):
             "location",
             "description",
             "image",
+            "lat",
+            "lng",
             "average_rating",
             "review_count",
         )
