@@ -17,15 +17,13 @@ class User(AbstractUser):
         ("owner", "Owner"),
     )
 
-    # ✅ Override username — remove global uniqueness.
-    # Email is now the unique login identifier, so two people
-    # named "steve" can exist as different roles.
+    
     username = models.CharField(
         max_length=150,
         blank=False,
     )
 
-    # ✅ Email is now unique — it's the login field
+    #Email is now unique — it's the login field
     email = models.EmailField(
         unique=True,
     )
@@ -39,15 +37,15 @@ class User(AbstractUser):
     # 📞 Phone
     phone = models.CharField(
         max_length=15,
-        blank=True,
-        null=True,
+        blank=False,
+        null=False,
     )
 
     # 📍 Location
     location = models.CharField(
         max_length=255,
-        blank=True,
-        null=True,
+        blank=False,
+        null=False,
     )
 
     # Tell Django to use email as the unique identifier for auth
@@ -394,3 +392,62 @@ class Review(models.Model):
 
     def __str__(self):
         return f"{self.user.username} rated {self.shop.name} {self.rating}★"
+
+
+# =============================
+# 🔔 NOTIFICATION MODEL
+# =============================
+class Notification(models.Model):
+
+    # Who this notification is for — a customer (order status update)
+    # or an owner (new order / new review).
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="notifications",
+    )
+
+    NOTIF_TYPE_CHOICES = (
+        ("order_confirmed", "Order Confirmed"),
+        ("order_washing", "Order Washing"),
+        ("order_completed", "Order Completed"),
+        ("order_declined", "Order Declined"),
+        ("order_cancelled", "Order Cancelled"),
+        ("new_review", "New Review"),
+    )
+
+    notif_type = models.CharField(
+        max_length=20,
+        choices=NOTIF_TYPE_CHOICES,
+    )
+
+    message = models.CharField(max_length=255)
+
+    # Optional links back to the thing this notification is about, so
+    # the frontend can navigate there on click. Both optional since a
+    # notification might relate to an order, a review, or neither.
+    order = models.ForeignKey(
+        Order,
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        related_name="notifications",
+    )
+
+    review = models.ForeignKey(
+        Review,
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        related_name="notifications",
+    )
+
+    is_read = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"→ {self.user.username}: {self.message}"

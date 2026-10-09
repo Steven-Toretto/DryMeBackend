@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.db.models import Avg
 
-from .models import Shop, Service, Order, Review
+from .models import Shop, Service, Order, Review, Notification
 
 User = get_user_model()
 
@@ -515,3 +515,26 @@ class ReviewSerializer(serializers.ModelSerializer):
         if value and len(value) > 1000:
             raise serializers.ValidationError("Comment is too long.")
         return value
+
+
+# ===============================
+# 🔔 NOTIFICATION SERIALIZER
+# ===============================
+class NotificationSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Notification
+
+        fields = (
+            "id",
+            "notif_type",
+            "message",
+            "order",
+            "review",
+            "is_read",
+            "created_at",
+        )
+
+        read_only_fields = fields
+
+        

@@ -3,7 +3,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.forms import UserChangeForm, UserCreationForm
 from django import forms
 
-from .models import User, Shop, Service, Order, Review
+from .models import User, Shop, Service, Order, Review, Notification
 
 
 # ===============================
@@ -149,3 +149,16 @@ class ReviewAdmin(admin.ModelAdmin):
     list_filter = ("rating", "shop")
     search_fields = ("shop__name", "user__username", "comment")
     ordering = ("-created_at",)
+
+
+# ===============================
+# 🔔 NOTIFICATION ADMIN
+# ===============================
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = ("id", "user", "notif_type", "message", "is_read", "created_at")
+    list_filter = ("notif_type", "is_read")
+    search_fields = ("user__username", "message")
+    ordering = ("-created_at",)
+
+    

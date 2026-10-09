@@ -28,3 +28,6 @@ staticfiles/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Repomix Outputs
+repomix-output.md

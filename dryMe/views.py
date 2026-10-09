@@ -19,7 +19,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Sum
 import random
 
-from .models import Order, Shop, Service, Review
+from .models import Order, Shop, Service, Review, Notification
 from .serializers import (
     ShopSerializer,
     ServiceSerializer,
@@ -27,6 +27,8 @@ from .serializers import (
     RegisterSerializer,
     ProfileSerializer,
     ReviewSerializer,
+    NotificationSerializer,
+    
 )
 
 # ===============================
@@ -769,6 +771,19 @@ class OwnerOrderListView(
 # ===============================
 # 🔄 UPDATE ORDER STATUS
 # ===============================
+# ===============================
+# 🔔 NOTIFICATION HELPER
+# ===============================
+def notify(user, notif_type, message, order=None, review=None):
+    Notification.objects.create(
+        user=user,
+        notif_type=notif_type,
+        message=message,
+        order=order,
+        review=review,
+    )
+
+
 class UpdateOrderStatusView(
     generics.UpdateAPIView
 ):
@@ -836,10 +851,63 @@ class UpdateOrderStatusView(
 
         order.save()
 
+        # 🔔 Notify the customer their order moved forward
+        status_messages = {
+            "confirmed": ("order_confirmed", f"{order.shop.name} confirmed your order"),
+            "washing": ("order_washing", f"{order.shop.name} started washing your order"),
+            "completed": ("order_completed", f"{order.shop.name} completed your order — ready for pickup"),
+        }
+        if new_status in status_messages:
+            notif_type, message = status_messages[new_status]
+            notify(order.user, notif_type, message, order=order)
+
         return Response({
             "message": "Order status updated"
         })
 
+
+# ===============================
+# 🔔 MARK NOTIFICATIONS AS READ
+# ===============================
+class NotificationMarkReadView(APIView):
+
+    permission_classes = [
+        IsAuthenticated
+    ]
+
+    def put(self, request):
+
+        Notification.objects.filter(
+            user=request.user,
+            is_read=False
+        ).update(
+            is_read=True
+        )
+
+        return Response({
+            "message": "Notifications marked as read"
+        })
+
+
+# ===============================
+# 🔔 UNREAD NOTIFICATION COUNT
+# ===============================
+class UnreadNotificationCountView(APIView):
+
+    permission_classes = [
+        IsAuthenticated
+    ]
+
+    def get(self, request):
+
+        count = Notification.objects.filter(
+            user=request.user,
+            is_read=False
+        ).count()
+
+        return Response({
+            "count": count
+        })
 
 # ===============================
 # ❌ DECLINE ORDER
@@ -902,6 +970,14 @@ class DeclineOrderView(APIView):
 
         order.save()
 
+        # 🔔 Notify the customer
+        notify(
+            order.user,
+            "order_declined",
+            f"{order.shop.name} declined your order",
+            order=order,
+        )
+
         return Response({
             "message": "Order declined",
             "status": order.status,
@@ -953,6 +1029,14 @@ class CancelOrderView(APIView):
             order.refund_needed = True
 
         order.save()
+
+        # 🔔 Notify the shop owner — this one's initiated by the customer
+        notify(
+            order.shop.owner,
+            "order_cancelled",
+            f"{order.user.username} cancelled their order at {order.shop.name}",
+            order=order,
+        )
 
         return Response({
             "message": "Order cancelled",
@@ -1030,6 +1114,15 @@ class CreateReviewView(APIView):
             user=request.user,
             rating=rating,
             comment=comment.strip() if isinstance(comment, str) else "",
+        )
+
+        # 🔔 Notify the shop owner
+        stars = "★" * rating
+        notify(
+            order.shop.owner,
+            "new_review",
+            f"{request.user.username} left a {stars} review for {order.shop.name}",
+            review=review,
         )
 
         serializer = ReviewSerializer(review)
@@ -1193,3 +1286,62 @@ class ArchivedOrdersView(
             ).order_by("-created_at")
 
         return Order.objects.none()
+
+
+# ===============================
+# 🔔 NOTIFICATIONS
+# ===============================
+class NotificationListView(generics.ListAPIView):
+
+    serializer_class = NotificationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Notification.objects.filter(user=self.request.user)
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        unread_count = self.get_queryset().filter(is_read=False).count()
+        # Keep pagination (if enabled) intact by attaching unread_count
+        # alongside whatever shape .data already has.
+        if isinstance(response.data, dict):
+            response.data["unread_count"] = unread_count
+        else:
+            response.data = {
+                "results": response.data,
+                "unread_count": unread_count,
+            }
+        return response
+
+
+class MarkNotificationReadView(APIView):
+
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        try:
+            notification = Notification.objects.get(pk=pk, user=request.user)
+        except Notification.DoesNotExist:
+            return Response(
+                {"error": "Notification not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        notification.is_read = True
+        notification.save()
+
+        return Response({"message": "Marked as read"})
+
+
+class MarkAllNotificationsReadView(APIView):
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        Notification.objects.filter(
+            user=request.user,
+            is_read=False,
+        ).update(is_read=True)
+
+        return Response({"message": "All notifications marked as read"})
+    
