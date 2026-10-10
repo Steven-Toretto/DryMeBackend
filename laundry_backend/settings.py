@@ -7,6 +7,8 @@ from datetime import timedelta
 import os
 import dj_database_url
 import cloudinary
+from decimal import Decimal
+from django.core.exceptions import ImproperlyConfigured
 RENDER = os.environ.get("RENDER", False)
 
 # ===============================
@@ -191,7 +193,6 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 10,
 }
 
-
 # ===============================
 # 💳 MPESA
 # ===============================
@@ -199,11 +200,48 @@ MPESA_CONSUMER_KEY = os.environ.get("MPESA_CONSUMER_KEY", "")
 MPESA_CONSUMER_SECRET = os.environ.get("MPESA_CONSUMER_SECRET", "")
 MPESA_SHORTCODE = os.environ.get("MPESA_SHORTCODE", "174379")
 MPESA_PASSKEY = os.environ.get("MPESA_PASSKEY", "")
+
+# Unguessable token in the callback path. Generate with:
+#   python -c "import secrets; print(secrets.token_urlsafe(32))"
+MPESA_CALLBACK_SECRET = os.environ.get("MPESA_CALLBACK_SECRET", "")
+if RENDER and not MPESA_CALLBACK_SECRET:
+    raise ImproperlyConfigured("MPESA_CALLBACK_SECRET must be set in production.")
+
+# The URL Safaricom calls MUST include the secret.
 MPESA_CALLBACK_URL = os.environ.get(
     "MPESA_CALLBACK_URL",
-    "https://drymebackend-2.onrender.com/api/mpesa/callback/"
+    f"https://drymebackend-2.onrender.com/api/mpesa/callback/{MPESA_CALLBACK_SECRET}/",
 )
 
+# Optional extra layer. Comma-separated Safaricom source IPs (take them from the
+# current Daraja docs). Empty = disabled. Verify your host's X-Forwarded-For
+# chain before enabling, or you'll lock out real callbacks.
+MPESA_CALLBACK_ALLOWED_IPS = [
+    ip.strip() for ip in os.environ.get("MPESA_CALLBACK_ALLOWED_IPS", "").split(",") if ip.strip()
+]
+
+# ===============================
+# 💰 WALLET / PAYOUTS
+# ===============================
+def _env_decimal(name, default):
+    raw = os.environ.get(name)
+    if raw is None:
+        if RENDER:  # fail loudly in production rather than silently paying out at a 0 fee
+            raise ImproperlyConfigured(f"{name} must be set in production.")
+        raw = default
+    return Decimal(raw)
+
+COMMISSION_RATE = _env_decimal("COMMISSION_RATE", "0.10")          # 0.10 = 10%
+PAYOUT_FEES = {
+    "mpesa": _env_decimal("MPESA_PAYOUT_FEE", "0"),                # whole KES, from your Daraja B2C tariff
+    "bank": _env_decimal("BANK_PAYOUT_FEE", "0"),
+}
+PAYOUT_MIN_NET = Decimal("1")  # smallest amount the owner must actually receive
+
+if not Decimal("0") <= COMMISSION_RATE < Decimal("1"):
+    raise ImproperlyConfigured("COMMISSION_RATE must be between 0 and 1.")
+if PAYOUT_FEES["mpesa"] != PAYOUT_FEES["mpesa"].to_integral_value():
+    raise ImproperlyConfigured("MPESA_PAYOUT_FEE must be a whole number of shillings.")
 # ===============================
 # JWT
 # ===============================

@@ -19,6 +19,20 @@ from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Sum
 import random
 
+import hmac
+import logging
+
+from django.conf import settings
+from django.db import transaction
+from django.shortcuts import get_object_or_404
+from rest_framework.decorators import authentication_classes
+from .services.payments import process_stk_callback
+
+from .services.wallet import settle_order
+logger = logging.getLogger(__name__)
+
+
+
 from .models import Order, Shop, Service, Review, Notification
 from .serializers import (
     ShopSerializer,
@@ -432,6 +446,12 @@ class MpesaSTKPushView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
+        if order.status in ("declined", "cancelled"):
+            return Response(
+                {"error": "This order is no longer active"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         if order.payment_status == "paid":
             return Response(
                 {"error": "Order is already paid"},
@@ -445,7 +465,8 @@ class MpesaSTKPushView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        if not order.total_price:
+        amount = order.payable_amount()
+        if amount < 1:
             return Response(
                 {"error": "Order total not calculated yet"},
                 status=status.HTTP_400_BAD_REQUEST
@@ -454,80 +475,77 @@ class MpesaSTKPushView(APIView):
         try:
             response = stk_push(
                 phone=phone,
-                amount=order.total_price,
+                amount=amount,
                 order_id=order.id
             )
-        except Exception as e:
+        except Exception:
+            logger.exception("M-Pesa STK push request failed for order %s", order.id)
             return Response(
-                {"error": f"M-Pesa request failed: {str(e)}"},
+                {"error": "M-Pesa request failed. Please try again."},
                 status=status.HTTP_502_BAD_GATEWAY
             )
 
         response_code = response.get("ResponseCode")
 
         if response_code == "0":
-            # ✅ STK push sent — reset status and store checkout ID
             order.payment_status = "pending_payment"
             order.mpesa_checkout_request_id = response.get("CheckoutRequestID")
             order.mpesa_transaction_code = None
-            order.save()
+            order.save(update_fields=[
+                "payment_status",
+                "mpesa_checkout_request_id",
+                "mpesa_transaction_code",
+            ])
 
             return Response({
                 "message": "Payment prompt sent to your phone. Enter your M-Pesa PIN to complete.",
                 "checkout_request_id": response.get("CheckoutRequestID"),
             })
 
-        else:
-            order.payment_status = "failed"
-            order.save()
+        order.payment_status = "failed"
+        order.save(update_fields=["payment_status"])
 
-            return Response(
-                {"error": response.get("ResponseDescription", "STK push failed")},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        return Response(
+            {"error": response.get("ResponseDescription", "STK push failed")},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
 
 # ===============================
 # 📩 MPESA CALLBACK
 # ===============================
+def _client_ip(request):
+    # Use the rightmost forwarded hop, which should be added by our trusted proxy.
+    xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
+    if xff:
+        return xff.split(",")[-1].strip()
+    return request.META.get("REMOTE_ADDR")
+
+
 @api_view(["POST"])
+@authentication_classes([])
 @permission_classes([AllowAny])
-@csrf_exempt
-def mpesa_callback(request):
+def mpesa_callback(request, secret):
+    expected = getattr(settings, "MPESA_CALLBACK_SECRET", "")
+
+    # Fail closed if the secret is not configured or the URL secret is incorrect.
+    if not expected or not hmac.compare_digest(str(secret), str(expected)):
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    allowed_ips = getattr(settings, "MPESA_CALLBACK_ALLOWED_IPS", [])
+    client_ip = _client_ip(request)
+    if allowed_ips and client_ip not in allowed_ips:
+        logger.warning("M-Pesa callback from non-allowlisted IP %s", client_ip)
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
     try:
-        body = request.data
-        callback = body["Body"]["stkCallback"]
-        result_code = callback["ResultCode"]
-        checkout_request_id = callback["CheckoutRequestID"]
-
-        try:
-            order = Order.objects.get(
-                mpesa_checkout_request_id=checkout_request_id
-            )
-        except Order.DoesNotExist:
-            return Response({"status": "ok"})
-
-        if result_code == 0:
-            # ✅ Payment successful
-            metadata = callback["CallbackMetadata"]["Item"]
-            transaction_code = next(
-                (item["Value"] for item in metadata if item["Name"] == "MpesaReceiptNumber"),
-                None
-            )
-            order.payment_status = "paid"
-            order.mpesa_transaction_code = transaction_code
-            order.save()
-
-        else:
-            # ❌ Payment failed or cancelled
-            order.payment_status = "failed"
-            order.save()
-
+        outcome = process_stk_callback(request.data)
+        logger.info("M-Pesa callback outcome=%s", outcome)
     except Exception:
-        pass
+        logger.exception("M-Pesa callback processing failed")
 
-    # Always return 200 to Safaricom
-    return Response({"status": "ok"})
+    # Acknowledge the callback so Safaricom does not repeatedly retry it.
+    return Response({"ResultCode": 0, "ResultDesc": "Accepted"})
 
 
 # ===============================
@@ -795,75 +813,78 @@ class UpdateOrderStatusView(
 
     queryset = Order.objects.all()
 
-    def update(
-        self,
-        request,
-        *args,
-        **kwargs
-    ):
-
-        order = self.get_object()
-
-        # ONLY SHOP OWNER
-        if order.shop.owner != request.user:
-
-            return Response(
-                {"error": "Not allowed"},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-        # 🚫 Declined/cancelled orders are a dead end — book again instead
-        if order.status in ["declined", "cancelled"]:
-            return Response(
-                {"error": f"This order was {order.status} and can no longer be updated"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        new_status = request.data.get(
-            "status"
-        )
-
-        valid_statuses = [
-            "pending",
-            "confirmed",
-            "washing",
-            "completed"
-        ]
-
-        if new_status not in valid_statuses:
-
-            return Response(
-                {"error": "Invalid status"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
+    def update(self, request, *args, **kwargs):
         from django.utils import timezone
 
-        order.status = new_status
+        notification = None
 
-        # ⏱️ Auto-set timestamps when status changes
-        if new_status == "confirmed" and not order.confirmed_at:
-            order.confirmed_at = timezone.now()
-        elif new_status == "washing" and not order.washing_at:
-            order.washing_at = timezone.now()
-        elif new_status == "completed" and not order.completed_at:
-            order.completed_at = timezone.now()
+        with transaction.atomic():
+            order = get_object_or_404(
+                Order.objects.select_for_update(),
+                pk=kwargs["pk"]
+            )
 
-        order.save()
+            # ONLY SHOP OWNER
+            if order.shop.owner != request.user:
+                return Response(
+                    {"error": "Not allowed"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
 
-        # 🔔 Notify the customer their order moved forward
-        status_messages = {
-            "confirmed": ("order_confirmed", f"{order.shop.name} confirmed your order"),
-            "washing": ("order_washing", f"{order.shop.name} started washing your order"),
-            "completed": ("order_completed", f"{order.shop.name} completed your order — ready for pickup"),
-        }
-        if new_status in status_messages:
-            notif_type, message = status_messages[new_status]
-            notify(order.user, notif_type, message, order=order)
+            # Declined/cancelled orders cannot be updated.
+            if order.status in ["declined", "cancelled"]:
+                return Response(
+                    {"error": f"This order was {order.status} and can no longer be updated"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-        return Response({
-            "message": "Order status updated"
-        })
+            # Completed is final because earnings may already be credited.
+            if order.status == "completed":
+                return Response(
+                    {"error": "This order is already completed"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            new_status = request.data.get("status")
+            if new_status not in ["pending", "confirmed", "washing", "completed"]:
+                return Response(
+                    {"error": "Invalid status"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            order.status = new_status
+            fields = ["status"]
+            now = timezone.now()
+
+            # Automatically set timestamps when the status first reaches a stage.
+            if new_status == "confirmed" and not order.confirmed_at:
+                order.confirmed_at = now
+                fields.append("confirmed_at")
+            elif new_status == "washing" and not order.washing_at:
+                order.washing_at = now
+                fields.append("washing_at")
+            elif new_status == "completed" and not order.completed_at:
+                order.completed_at = now
+                fields.append("completed_at")
+
+            order.save(update_fields=fields)
+
+            # Credit the owner's wallet when an order is completed.
+            if new_status == "completed":
+                settle_order(order.pk)
+
+            status_messages = {
+                "confirmed": ("order_confirmed", f"{order.shop.name} confirmed your order"),
+                "washing": ("order_washing", f"{order.shop.name} started washing your order"),
+                "completed": ("order_completed", f"{order.shop.name} completed your order — ready for pickup"),
+            }
+            notification = status_messages.get(new_status)
+
+        # Notify after the transaction so notification failures do not undo order updates.
+        if notification:
+            notify(order.user, notification[0], notification[1], order=order)
+
+        return Response({"message": "Order status updated"})
 
 
 # ===============================
@@ -919,63 +940,61 @@ class DeclineOrderView(APIView):
     ]
 
     def post(self, request, pk):
-
-        try:
-            order = Order.objects.get(pk=pk)
-        except Order.DoesNotExist:
-            return Response(
-                {"error": "Order not found"},
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-        # ONLY SHOP OWNER
-        if order.shop.owner != request.user:
-            return Response(
-                {"error": "Not allowed"},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-        # 🚫 Can only decline before washing starts — once washing/completed/
-        # declined/cancelled, it's too late to turn the order away
-        if order.status in ["washing", "completed", "declined", "cancelled"]:
-            return Response(
-                {"error": "This order can no longer be declined"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        from django.utils import timezone
 
         reason = request.data.get("reason", "")
         reason = reason.strip() if isinstance(reason, str) else ""
 
-        if not reason:
-            return Response(
-                {"error": "A reason is required to decline an order"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        with transaction.atomic():
+            order = Order.objects.select_for_update().filter(pk=pk).first()
+            if order is None:
+                return Response(
+                    {"error": "Order not found"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
 
-        if len(reason) > 500:
-            return Response(
-                {"error": "Reason must be under 500 characters"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            if order.shop.owner != request.user:
+                return Response(
+                    {"error": "Not allowed"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
 
-        from django.utils import timezone
+            if order.status in ["washing", "completed", "declined", "cancelled"]:
+                return Response(
+                    {"error": "This order can no longer be declined"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-        order.status = "declined"
-        order.decline_reason = reason
-        order.declined_at = timezone.now()
+            if not reason:
+                return Response(
+                    {"error": "A reason is required to decline an order"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-        # 💸 Flag for manual refund if the customer already paid
-        if order.payment_status == "paid":
-            order.refund_needed = True
+            if len(reason) > 500:
+                return Response(
+                    {"error": "Reason must be under 500 characters"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-        order.save()
+            order.status = "declined"
+            order.decline_reason = reason
+            order.declined_at = timezone.now()
+            if order.payment_status == "paid":
+                order.refund_needed = True
 
-        # 🔔 Notify the customer
+            order.save(update_fields=[
+                "status",
+                "decline_reason",
+                "declined_at",
+                "refund_needed",
+            ])
+
         notify(
             order.user,
             "order_declined",
             f"{order.shop.name} declined your order",
-            order=order,
+            order=order
         )
 
         return Response({
@@ -996,41 +1015,39 @@ class CancelOrderView(APIView):
     ]
 
     def post(self, request, pk):
-
-        try:
-            order = Order.objects.get(pk=pk)
-        except Order.DoesNotExist:
-            return Response(
-                {"error": "Order not found"},
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-        # ONLY THE CUSTOMER WHO PLACED IT
-        if order.user != request.user:
-            return Response(
-                {"error": "Not allowed"},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-        # 🚫 Can only cancel before washing starts
-        if order.status in ["washing", "completed", "declined", "cancelled"]:
-            return Response(
-                {"error": "This order can no longer be cancelled"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
         from django.utils import timezone
 
-        order.status = "cancelled"
-        order.cancelled_at = timezone.now()
+        with transaction.atomic():
+            order = Order.objects.select_for_update().filter(pk=pk).first()
+            if order is None:
+                return Response(
+                    {"error": "Order not found"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
 
-        # 💸 Flag for manual refund if the customer already paid
-        if order.payment_status == "paid":
-            order.refund_needed = True
+            if order.user != request.user:
+                return Response(
+                    {"error": "Not allowed"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
 
-        order.save()
+            if order.status in ["washing", "completed", "declined", "cancelled"]:
+                return Response(
+                    {"error": "This order can no longer be cancelled"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-        # 🔔 Notify the shop owner — this one's initiated by the customer
+            order.status = "cancelled"
+            order.cancelled_at = timezone.now()
+            if order.payment_status == "paid":
+                order.refund_needed = True
+
+            order.save(update_fields=[
+                "status",
+                "cancelled_at",
+                "refund_needed",
+            ])
+
         notify(
             order.shop.owner,
             "order_cancelled",
@@ -1162,7 +1179,7 @@ class UpdateOrderNotesView(APIView):
 
         notes = request.data.get("notes", "")
         order.customer_notes = notes
-        order.save()
+        order.save( update_fields=["customer_notes"])
 
         return Response({
             "message": "Notes updated",
@@ -1219,7 +1236,7 @@ class ArchiveOrderView(APIView):
                 )
 
             order.customer_archived = True
-            order.save()
+            order.save( update_fields=["customer_archived"])
 
             return Response({
                 "message":
@@ -1240,7 +1257,7 @@ class ArchiveOrderView(APIView):
                 )
 
             order.owner_archived = True
-            order.save()
+            order.save( update_fields=["owner_archived"])
 
             return Response({
                 "message":

@@ -1,6 +1,6 @@
 import os
 import uuid
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.db import models
 from django.contrib.auth.models import AbstractUser
@@ -277,6 +277,12 @@ class Order(models.Model):
     # 💸 Flags a declined order that was already paid, so the owner
     # knows to issue a manual M-Pesa refund
     refund_needed = models.BooleanField(default=False)
+        # 💰 Settlement snapshot (filled by services.wallet.settle_order)
+    # amount_paid = what M-Pesa actually delivered (whole shillings).
+    amount_paid = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    commission_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    owner_earnings = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    settled_at = models.DateTimeField(blank=True, null=True)
 
     # 📁 Archive flags (independent per role)
     customer_archived = models.BooleanField(default=False)
@@ -340,6 +346,10 @@ class Order(models.Model):
                 self.customer_location = self.user.location
 
         super().save(*args, **kwargs)
+
+    def payable_amount(self):
+        """Whole-shilling amount sent in the STK push (Daraja takes integers)."""
+        return int((self.total_price or Decimal("0")).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
     def __str__(self):
         return (
@@ -451,3 +461,126 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"→ {self.user.username}: {self.message}"
+
+
+# =============================
+# 👛 WALLET
+# =============================
+class Wallet(models.Model):
+
+    # PROTECT: a user holding money can't be hard-deleted by accident.
+    owner = models.OneToOneField(User, on_delete=models.PROTECT, related_name="wallet")
+    balance = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=models.Q(balance__gte=0), name="wallet_balance_non_negative"),
+        ]
+
+    def __str__(self):
+        return f"{self.owner.username}: KES {self.balance}"
+
+
+# =============================
+# 💸 PAYOUT (withdrawal request)
+# =============================
+class Payout(models.Model):
+
+    METHOD_CHOICES = (("mpesa", "M-Pesa"), ("bank", "Bank"))
+    STATUS_CHOICES = (
+        ("requested", "Requested"),
+        ("approved", "Approved"),
+        ("paid", "Paid"),
+        ("rejected", "Rejected"),
+        ("failed", "Failed"),
+    )
+
+    owner = models.ForeignKey(User, on_delete=models.PROTECT, related_name="payouts")
+
+    # amount = gross, leaves the wallet. fee = snapshotted at request time.
+    # net_amount = amount - fee = what you actually send.
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    fee = models.DecimalField(max_digits=10, decimal_places=2)
+    net_amount = models.DecimalField(max_digits=10, decimal_places=2)
+
+    method = models.CharField(max_length=10, choices=METHOD_CHOICES)
+    destination = models.CharField(max_length=255)  # 2547… for M-Pesa, free text for bank
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="requested")
+
+    reference = models.CharField(max_length=100, blank=True, default="")  # M-Pesa code / bank ref
+    reject_reason = models.TextField(blank=True, default="")
+
+    reviewed_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="reviewed_payouts",
+    )
+    requested_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(blank=True, null=True)
+    paid_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        ordering = ["-requested_at"]
+        constraints = [
+            # One open payout per owner — enforced by the database, not just the service.
+            models.UniqueConstraint(
+                fields=["owner"],
+                condition=models.Q(status__in=["requested", "approved"]),
+                name="one_open_payout_per_owner",
+            ),
+            models.CheckConstraint(condition=models.Q(amount__gt=0), name="payout_amount_positive"),
+            models.CheckConstraint(condition=models.Q(net_amount__gt=0), name="payout_net_positive"),
+            models.CheckConstraint(
+                condition=models.Q(net_amount=models.F("amount") - models.F("fee")),
+                name="payout_net_equals_amount_minus_fee",
+            ),
+        ]
+
+    def __str__(self):
+        return f"Payout #{self.pk} {self.owner.username} KES {self.amount} ({self.status})"
+
+
+# =============================
+# 📒 WALLET LEDGER (append-only)
+# =============================
+class WalletTransaction(models.Model):
+
+    TYPE_CHOICES = (
+        ("sale_credit", "Sale credit"),
+        ("payout_hold", "Payout hold"),
+        ("payout_reversal", "Payout reversal"),
+        ("adjustment", "Adjustment"),
+    )
+
+    wallet = models.ForeignKey(Wallet, on_delete=models.PROTECT, related_name="transactions")
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)          # signed
+    balance_after = models.DecimalField(max_digits=12, decimal_places=2)
+
+    # SET_NULL: deleting a shop cascades to its orders — the money trail must survive.
+    order = models.ForeignKey(
+        Order, on_delete=models.SET_NULL, null=True, blank=True, related_name="wallet_transactions",
+    )
+    payout = models.ForeignKey(
+        Payout, on_delete=models.PROTECT, null=True, blank=True, related_name="wallet_transactions",
+    )
+    note = models.CharField(max_length=255, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["order"],
+                condition=models.Q(type="sale_credit"),
+                name="uniq_sale_credit_per_order",
+            ),
+            models.UniqueConstraint(
+                fields=["payout", "type"],
+                condition=models.Q(payout__isnull=False),
+                name="uniq_ledger_entry_per_payout_type",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.type} {self.amount} → {self.balance_after}"
