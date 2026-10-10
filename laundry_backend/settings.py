@@ -242,6 +242,15 @@ if not Decimal("0") <= COMMISSION_RATE < Decimal("1"):
     raise ImproperlyConfigured("COMMISSION_RATE must be between 0 and 1.")
 if PAYOUT_FEES["mpesa"] != PAYOUT_FEES["mpesa"].to_integral_value():
     raise ImproperlyConfigured("MPESA_PAYOUT_FEE must be a whole number of shillings.")
+
+# Seconds to wait before another STK prompt can be sent for the same order while
+# one is still pending. Set to 0 to disable. Safe either way — every prompt is
+# tracked as its own PaymentAttempt — this just stops accidental double prompts.
+MPESA_STK_COOLDOWN_SECONDS = int(os.environ.get("MPESA_STK_COOLDOWN_SECONDS", "60"))
+
+MPESA_BASE_URL = os.environ.get("MPESA_BASE_URL", "https://sandbox.safaricom.co.ke")
+
+
 # ===============================
 # JWT
 # ===============================

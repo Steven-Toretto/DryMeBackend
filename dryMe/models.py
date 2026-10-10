@@ -247,19 +247,9 @@ class Order(models.Model):
         default="unpaid",
     )
 
-    # M-Pesa checkout request ID for tracking
-    mpesa_checkout_request_id = models.CharField(
-        max_length=100,
-        blank=True,
-        null=True,
-    )
 
-    # M-Pesa transaction code after successful payment
-    mpesa_transaction_code = models.CharField(
-        max_length=50,
-        blank=True,
-        null=True,
-    )
+    # Receipt of the attempt that settled this order (copied from PaymentAttempt on success)
+    mpesa_transaction_code = models.CharField(max_length=50, blank=True, null=True)
 
     # 🚦 Order status
     status = models.CharField(
@@ -584,3 +574,53 @@ class WalletTransaction(models.Model):
 
     def __str__(self):
         return f"{self.type} {self.amount} → {self.balance_after}"
+
+# =============================
+# 📲 PAYMENT ATTEMPT (one row per STK prompt)
+# =============================
+class PaymentAttempt(models.Model):
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        SUCCESSFUL = "successful", "Successful"
+        FAILED = "failed", "Failed"
+
+    # SET_NULL, like the wallet ledger: deleting a shop cascades to its orders,
+    # but the record of money we received must survive.
+    order = models.ForeignKey(
+        Order,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="payment_attempts",
+    )
+
+    # Safaricom's CheckoutRequestID — the key every webhook is matched on.
+    checkout_request_id = models.CharField(max_length=100, unique=True)
+
+    # M-Pesa receipt, filled on success.
+    transaction_code = models.CharField(max_length=50, blank=True, null=True)
+
+    # Whole-shilling amount requested in THIS prompt; the webhook's Amount must equal it.
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+
+    status = models.CharField(
+        max_length=12,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+
+    # Added beyond the spec: set when this attempt succeeded but the money isn't
+    # earning anything (a 2nd payment for an already-paid order, or the order was
+    # deleted). It's what lets you find double-tap payments to refund.
+    refund_needed = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.checkout_request_id} — KES {self.amount} ({self.status})"
+

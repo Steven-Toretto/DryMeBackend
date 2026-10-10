@@ -12,8 +12,7 @@ from django.test import TestCase, override_settings
 from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIClient
 
-from dryMe.models import Order, Payout, Service, Shop, User, Wallet, WalletTransaction
-
+from .models import Order, PaymentAttempt, Payout, Service, Shop, User, Wallet, WalletTransaction
 from .services import payments
 from .services.wallet import (
     _apply,
@@ -92,8 +91,10 @@ class WalletTestCase(TestCase):
     def pending_order(self, checkout="ws_CO_1", kg="4"):
         order = self.make_order(kg)
         order.payment_status = "pending_payment"
-        order.mpesa_checkout_request_id = checkout
-        order.save(update_fields=["payment_status", "mpesa_checkout_request_id"])
+        order.save(update_fields=["payment_status"])
+        PaymentAttempt.objects.create(
+            order=order, checkout_request_id=checkout, amount=Decimal(order.payable_amount()),
+        )
         return order
 
     def fund(self, amount):
@@ -426,7 +427,7 @@ class CallbackTests(WalletTestCase):
     def test_outcomes_from_service(self):
         self.pending_order()
         self.assertEqual(payments.process_stk_callback({}), "malformed")
-        self.assertEqual(payments.process_stk_callback(stk_payload("nope", amount=1)), "unknown_order")
+        self.assertEqual(payments.process_stk_callback(stk_payload("nope", amount=1)), "unknown_attempt")
         self.assertEqual(payments.process_stk_callback(stk_payload("ws_CO_1", amount=5)), "amount_mismatch")
         self.assertEqual(payments.process_stk_callback(stk_payload("ws_CO_1", amount=400)), "paid")
         self.assertEqual(payments.process_stk_callback(stk_payload("ws_CO_1", amount=400)), "duplicate")

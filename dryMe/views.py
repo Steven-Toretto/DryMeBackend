@@ -1,3 +1,6 @@
+from django.utils import timezone
+from decimal import Decimal
+from datetime import timedelta
 from rest_framework import generics, permissions, parsers, status
 from rest_framework.permissions import (
     IsAuthenticated,
@@ -33,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 
-from .models import Order, Shop, Service, Review, Notification
+from .models import Order, Shop, Service, Review, Notification, PaymentAttempt
 from .serializers import (
     ShopSerializer,
     ServiceSerializer,
@@ -436,78 +439,108 @@ class MpesaSTKPushView(APIView):
         from .mpesa import stk_push
 
         try:
-            order = Order.objects.get(
-                id=order_id,
-                user=request.user
-            )
+            order = Order.objects.get(id=order_id, user=request.user)
         except Order.DoesNotExist:
             return Response(
                 {"error": "Order not found"},
-                status=status.HTTP_404_NOT_FOUND
+                status=status.HTTP_404_NOT_FOUND,
             )
 
         if order.status in ("declined", "cancelled"):
             return Response(
                 {"error": "This order is no longer active"},
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         if order.payment_status == "paid":
             return Response(
                 {"error": "Order is already paid"},
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         phone = request.user.phone
         if not phone:
             return Response(
                 {"error": "No phone number on your account. Please update your profile."},
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         amount = order.payable_amount()
         if amount < 1:
             return Response(
                 {"error": "Order total not calculated yet"},
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_400_BAD_REQUEST,
             )
+
+        # Best-effort guard against double taps. Each prompt has its own attempt.
+        cooldown = getattr(settings, "MPESA_STK_COOLDOWN_SECONDS", 60)
+        if cooldown > 0:
+            cutoff = timezone.now() - timedelta(seconds=cooldown)
+            if order.payment_attempts.filter(
+                status=PaymentAttempt.Status.PENDING,
+                created_at__gte=cutoff,
+            ).exists():
+                return Response(
+                    {
+                        "error": (
+                            "A payment prompt was just sent to your phone. Enter your "
+                            "M-Pesa PIN, or wait a minute before trying again."
+                        )
+                    },
+                    status=status.HTTP_429_TOO_MANY_REQUESTS,
+                )
 
         try:
-            response = stk_push(
-                phone=phone,
-                amount=amount,
-                order_id=order.id
-            )
+            response = stk_push(phone=phone, amount=amount, order_id=order.id)
         except Exception:
-            logger.exception("M-Pesa STK push request failed for order %s", order.id)
+            logger.exception("STK push failed for order=%s", order.id)
             return Response(
-                {"error": "M-Pesa request failed. Please try again."},
-                status=status.HTTP_502_BAD_GATEWAY
+                {"error": "Couldn't reach M-Pesa. Please try again."},
+                status=status.HTTP_502_BAD_GATEWAY,
             )
 
-        response_code = response.get("ResponseCode")
+        if response.get("ResponseCode") == "0":
+            checkout_id = response.get("CheckoutRequestID")
+            if not checkout_id:
+                logger.error(
+                    "STK push accepted without CheckoutRequestID order=%s",
+                    order.id,
+                )
+                return Response(
+                    {"error": "M-Pesa returned an unexpected response. Please try again."},
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
 
-        if response_code == "0":
-            order.payment_status = "pending_payment"
-            order.mpesa_checkout_request_id = response.get("CheckoutRequestID")
-            order.mpesa_transaction_code = None
-            order.save(update_fields=[
-                "payment_status",
-                "mpesa_checkout_request_id",
-                "mpesa_transaction_code",
-            ])
+            with transaction.atomic():
+                PaymentAttempt.objects.create(
+                    order=order,
+                    checkout_request_id=checkout_id,
+                    amount=Decimal(amount),
+                )
+                # Avoid downgrading an order already marked paid by a callback.
+                Order.objects.filter(pk=order.pk).exclude(
+                    payment_status="paid"
+                ).update(payment_status="pending_payment")
 
-            return Response({
-                "message": "Payment prompt sent to your phone. Enter your M-Pesa PIN to complete.",
-                "checkout_request_id": response.get("CheckoutRequestID"),
-            })
+            return Response(
+                {
+                    "message": (
+                        "Payment prompt sent to your phone. Enter your M-Pesa PIN "
+                        "to complete."
+                    ),
+                    "checkout_request_id": checkout_id,
+                }
+            )
 
-        order.payment_status = "failed"
-        order.save(update_fields=["payment_status"])
+        # No attempt row exists when Safaricom refuses to send the prompt.
+        Order.objects.filter(
+            pk=order.pk,
+            payment_status="unpaid",
+        ).update(payment_status="failed")
 
         return Response(
             {"error": response.get("ResponseDescription", "STK push failed")},
-            status=status.HTTP_400_BAD_REQUEST
+            status=status.HTTP_400_BAD_REQUEST,
         )
 
 

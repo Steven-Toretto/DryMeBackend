@@ -3,7 +3,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.forms import UserChangeForm, UserCreationForm
 from django import forms
 
-from .models import User, Shop, Service, Order, Review, Notification
+from .models import User, Shop, Service, Order, Review, Notification, PaymentAttempt
 
 
 # ===============================
@@ -161,4 +161,19 @@ class NotificationAdmin(admin.ModelAdmin):
     search_fields = ("user__username", "message")
     ordering = ("-created_at",)
 
-    
+# ==============================
+# 💰 PAYMENT ATTEMPT ADMIN
+@admin.register(PaymentAttempt)
+class PaymentAttemptAdmin(admin.ModelAdmin):
+    list_display = ("id", "order", "checkout_request_id", "transaction_code",
+                    "amount", "status", "refund_needed", "created_at")
+    list_filter = ("status", "refund_needed")
+    search_fields = ("checkout_request_id", "transaction_code", "order__id")
+    ordering = ("-created_at",)
+    readonly_fields = [f.name for f in PaymentAttempt._meta.fields if f.name != "refund_needed"]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
