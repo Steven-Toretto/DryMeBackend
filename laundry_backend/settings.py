@@ -9,6 +9,7 @@ import dj_database_url
 import cloudinary
 from decimal import Decimal
 from django.core.exceptions import ImproperlyConfigured
+
 RENDER = os.environ.get("RENDER", False)
 
 # ===============================
@@ -316,3 +317,7 @@ USE_TZ = True
 # DEFAULT PRIMARY KEY
 # ===============================
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+import sys
+if "test" in sys.argv:
+    PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]

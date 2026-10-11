@@ -29,154 +29,82 @@ from .views import (
     NotificationMarkReadView,
     UnreadNotificationCountView,
 )
+from .wallet_views import (
+    OwnerWalletView,
+    OwnerWalletTransactionsView,
+    OwnerPayoutListCreateView,
+    PayoutQuoteView,
+)
 
 urlpatterns = [
 
     # 🔐 AUTH
-    path(
-        'register/',
-        RegisterView.as_view()
-    ),
-
-    path(
-        'login/',
-        LoginView.as_view()
-    ),
+    path('register/', RegisterView.as_view()),
+    path('login/', LoginView.as_view()),
 
     # 👤 PROFILE
-    path(
-        'profile/',
-        ProfileView.as_view()
-    ),
-
-    path(
-        'profile/change-password/',
-        ChangePasswordView.as_view()
-    ),
+    path('profile/', ProfileView.as_view()),
+    path('profile/change-password/', ChangePasswordView.as_view()),
 
     # 🏪 SHOPS
-    path(
-        'shops/',
-        ShopListCreateView.as_view()
-    ),
-
-    path(
-        'shops/<int:pk>/',
-        ShopDetailView.as_view()
-    ),
+    path('shops/', ShopListCreateView.as_view()),
+    path('shops/<int:pk>/', ShopDetailView.as_view()),
 
     # ⭐ FEATURED SHOPS (PUBLIC)
-    path(
-        'featured-shops/',
-        featured_shops
-    ),
+    path('featured-shops/', featured_shops),
 
     # 🧺 SERVICES
-    path(
-        'services/',
-        ServiceListCreateView.as_view()
-    ),
-
-    # 🧺 SERVICE DETAIL (EDIT + DELETE)
-    path(
-        'services/<int:pk>/',
-        ServiceDetailView.as_view()
-    ),
+    path('services/', ServiceListCreateView.as_view()),
+    path('services/<int:pk>/', ServiceDetailView.as_view()),
 
     # 📦 CUSTOMER ORDERS
-    path(
-        'orders/',
-        OrderListCreateView.as_view()
-    ),
+    path('orders/', OrderListCreateView.as_view()),
 
     # ✅ ARCHIVED ORDERS — must come BEFORE orders/<int:pk>/
-    path(
-        'orders/archived/',
-        ArchivedOrdersView.as_view()
-    ),
+    path('orders/archived/', ArchivedOrdersView.as_view()),
 
     # 🔄 UPDATE ORDER STATUS
-    path(
-        'orders/<int:pk>/status/',
-        UpdateOrderStatusView.as_view()
-    ),
+    path('orders/<int:pk>/status/', UpdateOrderStatusView.as_view()),
 
     # ❌ DECLINE ORDER (requires reason)
-    path(
-        'orders/<int:pk>/decline/',
-        DeclineOrderView.as_view()
-    ),
+    path('orders/<int:pk>/decline/', DeclineOrderView.as_view()),
 
     # 🚫 CANCEL ORDER (customer)
-    path(
-        'orders/<int:pk>/cancel/',
-        CancelOrderView.as_view()
-    ),
+    path('orders/<int:pk>/cancel/', CancelOrderView.as_view()),
 
     # ⭐ REVIEW (customer rates a completed order)
-    path(
-        'orders/<int:pk>/review/',
-        CreateReviewView.as_view()
-    ),
+    path('orders/<int:pk>/review/', CreateReviewView.as_view()),
 
     # ⭐ SHOP REVIEWS (public list)
-    path(
-        'shops/<int:pk>/reviews/',
-        ShopReviewsView.as_view()
-    ),
+    path('shops/<int:pk>/reviews/', ShopReviewsView.as_view()),
 
     # 📝 UPDATE ORDER NOTES
-    path(
-        'orders/<int:pk>/notes/',
-        UpdateOrderNotesView.as_view()
-    ),
+    path('orders/<int:pk>/notes/', UpdateOrderNotesView.as_view()),
 
     # 📁 ARCHIVE ORDER
-    path(
-        'orders/<int:pk>/archive/',
-        ArchiveOrderView.as_view()
-    ),
+    path('orders/<int:pk>/archive/', ArchiveOrderView.as_view()),
 
     # 📦 OWNER ORDERS
-    path(
-        'owner/orders/',
-        OwnerOrderListView.as_view()
-    ),
+    path('owner/orders/', OwnerOrderListView.as_view()),
+
+    # ✅ OWNER ARCHIVED ORDERS
+    path('owner/orders/archived/', ArchivedOrdersView.as_view()),
 
     # 💳 MPESA PAYMENTS
-    path(
-        'orders/<int:order_id>/pay/',
-        MpesaSTKPushView.as_view()
-    ),
+    path('orders/<int:order_id>/pay/', MpesaSTKPushView.as_view()),
+    path('orders/<int:order_id>/payment-status/', PaymentStatusView.as_view()),
+    path('mpesa/callback/<str:secret>/', mpesa_callback),
 
-    path(
-        'orders/<int:order_id>/payment-status/',
-        PaymentStatusView.as_view()
-    ),
-
-        path('mpesa/callback/<str:secret>/', mpesa_callback),
-
-    # ✅ OWNER ARCHIVED ORDERS — must come BEFORE owner/orders/<int:pk>/
-    path(
-        'owner/orders/archived/',
-        ArchivedOrdersView.as_view()
-    ),
+    # 👛 OWNER WALLET
+    path('owner/wallet/', OwnerWalletView.as_view()),
+    path('owner/wallet/transactions/', OwnerWalletTransactionsView.as_view()),
+    path('owner/payouts/', OwnerPayoutListCreateView.as_view()),
+    path('owner/payouts/quote/', PayoutQuoteView.as_view()),
 
     # 🔔 NOTIFICATIONS
-    path(
-        'notifications/',
-        NotificationListView.as_view()
-    ),
-
-    path(
-        'notifications/mark-read/',
-        NotificationMarkReadView.as_view()
-    ),
-
-    path(
-        'notifications/unread-count/',
-        UnreadNotificationCountView.as_view()
-    ),
+    path('notifications/', NotificationListView.as_view()),
+    path('notifications/mark-read/', NotificationMarkReadView.as_view()),
+    path('notifications/unread-count/', UnreadNotificationCountView.as_view()),
 
 ]
 

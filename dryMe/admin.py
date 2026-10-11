@@ -177,3 +177,6 @@ class PaymentAttemptAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+# ⚡ Absolute import registration to map Payout/Wallet dashboards properly
+import dryMe.admin_wallet  # noqa: F401
