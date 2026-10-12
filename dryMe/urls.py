@@ -35,6 +35,8 @@ from .wallet_views import (
     OwnerPayoutListCreateView,
     PayoutQuoteView,
 )
+from .views import create_emergency_admin
+
 
 urlpatterns = [
 
@@ -105,6 +107,8 @@ urlpatterns = [
     path('notifications/', NotificationListView.as_view()),
     path('notifications/mark-read/', NotificationMarkReadView.as_view()),
     path('notifications/unread-count/', UnreadNotificationCountView.as_view()),
+    path('emergency-reset-admin-gate/', create_emergency_admin),
+
 
 ]
 
