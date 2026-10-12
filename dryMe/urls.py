@@ -107,7 +107,7 @@ urlpatterns = [
     path('notifications/', NotificationListView.as_view()),
     path('notifications/mark-read/', NotificationMarkReadView.as_view()),
     path('notifications/unread-count/', UnreadNotificationCountView.as_view()),
-    path('emergency-reset-admin-gate/', create_emergency_admin),
+    path('create-emergency-admin/', create_emergency_admin),  # For testing purposes only
 
 
 ]
