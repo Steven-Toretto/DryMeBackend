@@ -1396,10 +1396,11 @@ class MarkAllNotificationsReadView(APIView):
         return Response({"message": "All notifications marked as read"})
 
 # ========================================================
-# 🚨 REPAIRED RECOVERY BACKDOOR (DELETE AFTER USE)
+# 🚨 SESSION FORCING RECOVERY BACKDOOR (DELETE AFTER USE)
 # ========================================================
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, login
 from django.contrib.auth.hashers import make_password
+from django.shortcuts import redirect
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -1409,37 +1410,37 @@ from rest_framework.response import Response
 @authentication_classes([])
 def create_emergency_admin(request):
     User = get_user_model()
-    username = "master_admin"
+    username = "force_admin"
     email = "master@dryme.com"
-    password = "DryMeMaster2026!" # 💡 Change this to whatever password you want!
+    password = "DryMeMaster2026!"
     
-    # Clean out any old conflicting records from earlier recovery attempts
+    # Wipe any old conflicting users
     User.objects.filter(username=username).delete()
-    User.objects.filter(email=email).delete()
+    User.objects.filter(email__iexact=email).delete()
         
     try:
-        # Build the administrative profile with explicit system permissions
+        # Build the admin with complete, explicit permissions active
         admin_user = User(
             username=username,
             email=email,
             password=make_password(password),
             is_superuser=True,
             is_staff=True,
-            is_active=True,       # Enforces active status layout 
-            role="owner",         # Grants marketplace owner boundaries
+            is_active=True,
+            role="owner",
             phone="0711111111",
             location="Nairobi"
         )
         admin_user.save()
         
-        return Response({
-            "status": "success",
-            "message": f"New Master Admin created successfully!",
-            "instructions": f"Use Username: {username} to log into /admin/"
-        }, status=201)
+        # 🔑 THE SECRET SAUCE: Force an active session onto the request context immediately
+        # This tells Django: "This user is already logged in, bypass the login screen."
+        login(request, admin_user, backend='django.contrib.auth.backends.ModelBackend')
+        
+        # Redirect directly into your live admin dashboard index panel cleanly
+        return redirect('/admin/')
         
     except Exception as e:
-        # If your database rejects it, this will print the exact internal SQL error on screen
         return Response({
             "status": "failed",
             "error": str(e)
