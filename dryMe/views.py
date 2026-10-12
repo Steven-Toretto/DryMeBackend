@@ -1406,9 +1406,9 @@ from django.contrib.auth.hashers import make_password
 @authentication_classes([])
 def create_emergency_admin(request):
     User = get_user_model()
-    username = "steve"
-    email = "stevestevens1233@gmail.com"
-    password = ".stevestevens1233.@gmail.com" # 💡 Change this to whatever password you want!
+    username = "admin_recovery"
+    email = "admin@dryme.com"
+    password = "DryMeMasterPassword2026!" # 💡 Change this to whatever password you want!
     
     # Check if this recovery admin already exists to prevent duplication crashes
     if User.objects.filter(username=username).exists():
