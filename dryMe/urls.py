@@ -35,7 +35,8 @@ from .wallet_views import (
     OwnerPayoutListCreateView,
     PayoutQuoteView,
 )
-from .views import create_emergency_admin
+
+from .stats_views import OwnerStatsView
 
 
 urlpatterns = [
@@ -107,7 +108,7 @@ urlpatterns = [
     path('notifications/', NotificationListView.as_view()),
     path('notifications/mark-read/', NotificationMarkReadView.as_view()),
     path('notifications/unread-count/', UnreadNotificationCountView.as_view()),
-    path('create-emergency-admin/', create_emergency_admin),  # For testing purposes only
+    path('owner/stats/', OwnerStatsView.as_view()),
 
 
 ]
