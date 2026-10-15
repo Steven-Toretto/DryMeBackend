@@ -10,6 +10,12 @@ from rest_framework.decorators import (
     api_view,
     permission_classes
 )
+
+from rest_framework.exceptions import ValidationError as ApiValidationError
+from rest_framework.exceptions import PermissionDenied as DrfPermissionDenied
+from .services.notifications import notify
+
+
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import (
@@ -784,52 +790,45 @@ class OrderListCreateView(
             user=self.request.user
         )
 
-# ===============================
-# 🧺 OWNER ORDERS (With Hardened Status Filtering)
-# ===============================
+# ====================================================================
+# 🧺 OWNER ORDERS (Hardened Pagination & Dynamic Status Filtering)
+# ====================================================================
 class OwnerOrderListView(generics.ListAPIView):
+    """
+    GET owner/orders/?status=pending&page=2
+    Active (not archived) orders for this owner's shops, newest first, 10 per page.
+    ?status= filters BEFORE pagination, so older orders are always reachable.
+    """
+
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
-        if getattr(user, "role", "customer") != "owner":
-            # ✅ Fixed the AttributeError exception typo by utilizing DRF exceptions layer natively
-            from rest_framework.exceptions import PermissionDenied
-            raise PermissionDenied("Only owners can view this")
-            
-        queryset = Order.objects.filter(shop__owner=user, owner_archived=False).order_by("-created_at")
-        
-        # 🔍 Read status query filter parameter from URL (e.g. ?status=washing)
+        role = getattr(user, "role", "customer")
+
+        if role != "owner":
+            # ✅ Fixed the AttributeError exception mapping securely via DRF Exceptions layer
+            raise DrfPermissionDenied("Only owners can view this")
+
+        queryset = (
+            Order.objects
+            .filter(shop__owner=user, owner_archived=False)
+            .select_related("user", "shop__owner", "service", "review")
+            .order_by("-created_at", "-id")
+        )
+
         status_filter = self.request.query_params.get("status")
         if status_filter:
-            status_filter = status_filter.strip().lower()
-            valid_statuses = ["pending", "confirmed", "washing", "completed", "declined", "cancelled"]
-            
-            if status_filter not in valid_statuses:
-                # ✅ Validates input parameters immediately to prevent silent failures
-                from rest_framework.exceptions import ValidationError
-                raise ValidationError({"error": f"'{status_filter}' is not a valid order status tracking token"})
-                
+            # Enforces evaluation constraints across active schema structures
+            valid = {value for value, _label in Order.STATUS_CHOICES}
+            if status_filter not in valid:
+                raise ApiValidationError({"status": f"Unknown status '{status_filter}'."})
             queryset = queryset.filter(status=status_filter)
-            
+
         return queryset
 
 
-# ===============================
-# 🔄 UPDATE ORDER STATUS
-# ===============================
-# ===============================
-# 🔔 NOTIFICATION HELPER
-# ===============================
-def notify(user, notif_type, message, order=None, review=None):
-    Notification.objects.create(
-        user=user,
-        notif_type=notif_type,
-        message=message,
-        order=order,
-        review=review,
-    )
 
 
 class UpdateOrderStatusView(

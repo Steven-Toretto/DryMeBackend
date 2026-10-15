@@ -398,7 +398,6 @@ class Review(models.Model):
 # 🔔 NOTIFICATION MODEL
 # =============================
 class Notification(models.Model):
-
     # Who this notification is for — a customer (order status update)
     # or an owner (new order / new review).
     user = models.ForeignKey(
@@ -414,8 +413,13 @@ class Notification(models.Model):
         ("order_declined", "Order Declined"),
         ("order_cancelled", "Order Cancelled"),
         ("new_review", "New Review"),
+        ("wallet_credited", "Earnings Added"),
+        ("payout_approved", "Withdrawal Approved"),
+        ("payout_paid", "Withdrawal Paid"),
+        ("payout_rejected", "Withdrawal Rejected"),
+        ("payout_failed", "Withdrawal Failed"),
     )
-
+    
     notif_type = models.CharField(
         max_length=20,
         choices=NOTIF_TYPE_CHOICES,
@@ -443,7 +447,6 @@ class Notification(models.Model):
     )
 
     is_read = models.BooleanField(default=False)
-
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -451,7 +454,6 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"→ {self.user.username}: {self.message}"
-
 
 # =============================
 # 👛 WALLET
