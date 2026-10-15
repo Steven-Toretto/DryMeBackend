@@ -20,6 +20,7 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from ..models import Order, Payout, Wallet, WalletTransaction
+from .notifications import credit_message, notify_after_commit, payout_message
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +101,8 @@ def settle_order(order_id):
     order.owner_earnings = earnings
     order.settled_at = timezone.now()
     order.save(update_fields=["commission_amount", "owner_earnings", "settled_at"])
+
+    notify_after_commit(order.shop.owner, "wallet_credited", credit_message(order, earnings), order=order)
 
     logger.info("Settled order=%s gross=%s commission=%s earnings=%s", order.pk, gross, commission, earnings)
     return tx
@@ -218,6 +221,7 @@ def approve_payout(payout_id, admin_user):
     payout.status = "approved"
     _stamp_review(payout, admin_user)
     payout.save(update_fields=["status", "reviewed_by", "reviewed_at"])
+    notify_after_commit(payout.owner, "payout_approved", payout_message("approved", payout))
     return payout
 
 
@@ -235,6 +239,7 @@ def mark_payout_paid(payout_id, admin_user, reference):
     payout.paid_at = timezone.now()
     _stamp_review(payout, admin_user)
     payout.save(update_fields=["status", "reference", "paid_at", "reviewed_by", "reviewed_at"])
+    notify_after_commit(payout.owner, "payout_paid", payout_message("paid", payout))
     return payout
 
 
@@ -253,6 +258,7 @@ def _reverse_payout(payout_id, admin_user, reason, final_status):
         payout.reject_reason = reason
         _stamp_review(payout, admin_user)
         payout.save(update_fields=["status", "reject_reason", "reviewed_by", "reviewed_at"])
+        notify_after_commit(payout.owner, f"payout_{final_status}", payout_message(final_status, payout, reason))
     return payout
 
 

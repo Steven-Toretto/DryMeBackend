@@ -59,9 +59,17 @@ class OwnerStatsTests(WalletTestCase):
         self.assertEqual(data["shops_count"], 1)
         self.assertEqual(data["status_counts"], {status: 0 for status in ALL_STATUSES})
 
+    def test_new_owner_has_nothing_listed_or_archived(self):
+        data = self.api(self.owner).get(STATS).json()
+        self.assertEqual(data["listed_total"], 0)
+        self.assertEqual(data["archived_count"], 0)
+        self.assertEqual(data["listed_counts"], {status: 0 for status in ALL_STATUSES})
+
     def test_status_keys_follow_the_model(self):
         self.assertEqual({v for v, _ in Order.STATUS_CHOICES}, ALL_STATUSES)
-        self.assertEqual(set(owner_stats(self.owner)["status_counts"]), ALL_STATUSES)
+        stats = owner_stats(self.owner)
+        self.assertEqual(set(stats["status_counts"]), ALL_STATUSES)
+        self.assertEqual(set(stats["listed_counts"]), ALL_STATUSES)
 
     def test_counts_every_status(self):
         for status in ("pending", "pending", "confirmed", "washing", "completed", "completed", "completed",
@@ -82,12 +90,28 @@ class OwnerStatsTests(WalletTestCase):
         self.assertEqual(self.api(self.owner).get(STATS).json()["total_orders"], 23)
         self.assertEqual(self.api(self.owner).get(STATS).json()["status_counts"]["completed"], 23)
 
-    def test_archived_orders_still_count(self):
+    def test_archived_orders_still_count_in_lifetime_numbers(self):
         self.order("completed", owner_archived=True)
         self.order("completed")
         data = self.api(self.owner).get(STATS).json()
         self.assertEqual(data["total_orders"], 2)
         self.assertEqual(data["status_counts"]["completed"], 2)
+
+    def test_listed_counts_are_what_the_orders_tab_can_show(self):
+        self.order("completed", owner_archived=True)      # archived: not listed, counted as archived
+        self.order("declined", owner_archived=True)
+        self.order("completed")
+        self.order("pending")
+        self.order("pending")
+
+        data = self.api(self.owner).get(STATS).json()
+
+        self.assertEqual(data["listed_counts"]["completed"], 1)
+        self.assertEqual(data["listed_counts"]["pending"], 2)
+        self.assertEqual(data["listed_counts"]["declined"], 0)
+        self.assertEqual(data["listed_total"], 3)
+        self.assertEqual(data["archived_count"], 2)
+        self.assertEqual(data["total_orders"], 5)          # lifetime still sees everything
 
     def test_unique_customers_counts_people_not_orders(self):
         self.order()

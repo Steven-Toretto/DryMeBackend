@@ -784,39 +784,36 @@ class OrderListCreateView(
             user=self.request.user
         )
 
-
 # ===============================
-# 🧑‍🔧 OWNER ORDERS
+# 🧺 OWNER ORDERS (With Hardened Status Filtering)
 # ===============================
-class OwnerOrderListView(
-    generics.ListAPIView
-):
-
+class OwnerOrderListView(generics.ListAPIView):
     serializer_class = OrderSerializer
-    permission_classes = [
-        IsAuthenticated
-    ]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-
         user = self.request.user
-
-        role = getattr(
-            user,
-            "role",
-            "customer"
-        )
-
-        if role != "owner":
-
-            raise permissions.PermissionDenied(
-                "Only owners can view this"
-            )
-
-        return Order.objects.filter(
-            shop__owner=user,
-            owner_archived=False
-        ).order_by("-created_at")
+        if getattr(user, "role", "customer") != "owner":
+            # ✅ Fixed the AttributeError exception typo by utilizing DRF exceptions layer natively
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Only owners can view this")
+            
+        queryset = Order.objects.filter(shop__owner=user, owner_archived=False).order_by("-created_at")
+        
+        # 🔍 Read status query filter parameter from URL (e.g. ?status=washing)
+        status_filter = self.request.query_params.get("status")
+        if status_filter:
+            status_filter = status_filter.strip().lower()
+            valid_statuses = ["pending", "confirmed", "washing", "completed", "declined", "cancelled"]
+            
+            if status_filter not in valid_statuses:
+                # ✅ Validates input parameters immediately to prevent silent failures
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({"error": f"'{status_filter}' is not a valid order status tracking token"})
+                
+            queryset = queryset.filter(status=status_filter)
+            
+        return queryset
 
 
 # ===============================

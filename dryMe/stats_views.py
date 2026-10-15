@@ -8,9 +8,11 @@ from .services.owner_stats import owner_stats
 
 class OwnerStatsView(APIView):
     """
-    GET owner/stats/ — dashboard overview numbers over ALL of this owner's orders:
+    GET owner/stats/ — dashboard numbers, computed over ALL of this owner's orders:
     total_orders, orders_this_week (rolling 7 days), unique_customers,
-    status_counts {pending, confirmed, washing, completed, declined, cancelled}, shops_count.
+    status_counts {pending, confirmed, washing, completed, declined, cancelled}   (lifetime, archived included)
+    listed_counts / listed_total / archived_count                                (what the Orders tab can list)
+    shops_count.
     """
 
     permission_classes = [IsAuthenticated, IsShopOwner]
