@@ -156,14 +156,14 @@ class LoginView(APIView):
         })
 
 # ====================================================================
-# 📊 PROFILE STATS HELPER (Hardened Decimal Strings & Refund Safety)
+# 📊 PROFILE STATS HELPER (Standardized Formatting & Precise Auditing)
 # ====================================================================
 def build_profile_stats(user):
 
     if user.role == "owner":
         orders = Order.objects.filter(shop__owner=user)
 
-        # ✅ Gross sales = money actually received (amount_paid from M-Pesa) on orders completed.
+        # Gross sales = money actually received (amount_paid from M-Pesa) on orders completed.
         # Unpaid, declined, and cancelled orders are skipped. Enforces strict ledger alignment:
         # earnings = gross sales - commission. Sent as an exact 2-decimal text string.
         gross_sales = orders.filter(
@@ -179,7 +179,7 @@ def build_profile_stats(user):
             ).count(),
             "completed_orders": orders.filter(status="completed").count(),
             "declined_orders": orders.filter(status="declined").count(),
-            # ✅ Fixed the format spacing mapping to prevent '400' vs '400.00' assertion failures
+            # ✅ Forces exact 2-decimal tracking strings to clear the '400' vs '400.00' mismatch
             "revenue": f"{gross_sales:.2f}",
         }
 
@@ -188,13 +188,14 @@ def build_profile_stats(user):
     # ==========================================
     orders = Order.objects.filter(user=user)
 
-    # ✅ Excludes paid orders that were later cancelled or declined (refunded).
-    # This prevents counting money that was already given back to the customer's wallet.
+    # Total spent = what the customer actually paid (amount_paid from M-Pesa) on orders that
+    # weren't declined or cancelled. Those get refunded, so they aren't spending.
+    # Paid orders still in progress DO count: the money has left and the service is on its way.
     total_spent = orders.filter(
-        payment_status="paid"
+        payment_status="paid",
     ).exclude(
-        status__in=["cancelled", "declined"]
-    ).aggregate(total=Sum("total_price"))["total"] or Decimal("0.00")
+        status__in=["declined", "cancelled"],
+    ).aggregate(total=Sum("amount_paid"))["total"] or Decimal("0.00") # ✅ Changed to amount_paid
 
     return {
         "total_orders": orders.count(),
@@ -205,10 +206,9 @@ def build_profile_stats(user):
         "cancelled_orders": orders.filter(
             status__in=["cancelled", "declined"]
         ).count(),
-        # ✅ Formatted as a string to match the design conventions used across the wallet system
+        # ✅ Standardized as a 2-decimal text string token to resolve test client validation
         "total_spent": f"{total_spent:.2f}",
     }
-
 
 # ===============================
 # 👤 PROFILE (VIEW + UPDATE)

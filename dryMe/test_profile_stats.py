@@ -88,3 +88,67 @@ class OwnerGrossSalesTests(WalletTestCase):
         )
         self.sale()
         self.assertEqual(Decimal(self.gross_sales(other)), Decimal("0"))
+
+
+class CustomerTotalSpentTests(WalletTestCase):
+    """The customer Profile page's "Total spent": money that left them and wasn't given back."""
+
+    def total_spent(self, user=None):
+        client = APIClient()
+        client.force_authenticate(user or self.customer)
+        return client.get("/api/profile/").json()["stats"]["total_spent"]
+
+    def order(self, paid=True, status=None, customer=None):
+        order = self.make_order()
+        if customer is not None:
+            order.user = customer
+            order.save(update_fields=["user"])
+        if paid:
+            self.mark_paid(order)
+        if status:
+            order.status = status
+            order.save(update_fields=["status"])
+        return order
+
+    def test_nothing_spent_is_zero_and_a_string(self):
+        value = self.total_spent()
+        self.assertIsInstance(value, str)
+        self.assertEqual(Decimal(value), Decimal("0"))
+
+    def test_paid_orders_count_whether_or_not_they_are_finished(self):
+        self.order()                                   # paid, still pending: the money has left, service is coming
+        self.order(status="washing")
+        self.order(status="completed")
+        self.assertEqual(Decimal(self.total_spent()), Decimal("1200.00"))
+
+    def test_unpaid_orders_are_not_spending(self):
+        self.order(paid=False)
+        self.order(paid=False, status="completed")
+        self.assertEqual(Decimal(self.total_spent()), Decimal("0"))
+
+    def test_paid_then_cancelled_or_declined_is_refunded_so_not_spent(self):
+        self.order()                                   # counts: 400
+        self.order(status="cancelled")                 # paid, then cancelled -> refund owed
+        self.order(status="declined")                  # paid, then declined -> refund owed
+        self.assertEqual(Decimal(self.total_spent()), Decimal("400.00"))
+
+    def test_uses_what_was_actually_paid(self):
+        order = self.order()
+        order.amount_paid = Decimal("399.00")
+        order.save(update_fields=["amount_paid"])
+        self.assertEqual(Decimal(self.total_spent()), Decimal("399.00"))
+
+    def test_not_limited_to_one_page_of_orders(self):
+        for _ in range(12):
+            self.order()
+        self.assertEqual(Decimal(self.total_spent()), Decimal("4800.00"))
+
+    def test_other_customers_orders_are_not_included(self):
+        from .models import User
+        other = User.objects.create_user(
+            username="cust2", email="cust2@test.com", password="pass12345",
+            role="customer", phone="0744345678", location="Nairobi",
+        )
+        self.order(customer=other)
+        self.assertEqual(Decimal(self.total_spent()), Decimal("0"))
+        self.assertEqual(Decimal(self.total_spent(other)), Decimal("400.00"))
