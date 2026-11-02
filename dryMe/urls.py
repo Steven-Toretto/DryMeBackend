@@ -37,6 +37,7 @@ from .wallet_views import (
 )
 
 from .stats_views import OwnerStatsView
+from .weigh_in_views import AcceptPriceView, WeighOrderView
 
 
 urlpatterns = [
@@ -81,6 +82,10 @@ urlpatterns = [
     # ⭐ SHOP REVIEWS (public list)
     path('shops/<int:pk>/reviews/', ShopReviewsView.as_view()),
 
+    # ⚖️ WEIGH-IN (per-kg orders): shop enters the real weight, customer accepts a higher price
+    path('orders/<int:pk>/weigh/', WeighOrderView.as_view()),
+    path('orders/<int:pk>/accept-price/', AcceptPriceView.as_view()),
+
     # 📝 UPDATE ORDER NOTES
     path('orders/<int:pk>/notes/', UpdateOrderNotesView.as_view()),
 
@@ -118,3 +123,4 @@ if settings.DEBUG:
         settings.MEDIA_URL,
         document_root=settings.MEDIA_ROOT
     )
+

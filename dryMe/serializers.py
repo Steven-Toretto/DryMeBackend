@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Avg
 
 from .models import Shop, Service, Order, Review, Notification
+from .services.weigh_in import tolerance
 
 User = get_user_model()
 
@@ -331,6 +332,16 @@ class OrderSerializer(serializers.ModelSerializer):
     decline_reason = serializers.CharField(read_only=True)
     refund_needed = serializers.BooleanField(read_only=True)
 
+    # ===========================
+    # WEIGH-IN FIELDS (per-kg orders): the booked estimate, the weighed figures,
+    # and how far above the estimate a weighed price may go before the customer
+    # has to approve it (null for orders without a weigh-in).
+    # ===========================
+    weigh_in_tolerance = serializers.SerializerMethodField()
+
+    def get_weigh_in_tolerance(self, obj):
+        return str(tolerance()) if obj.is_weigh_in_order else None
+
     class Meta:
         model = Order
 
@@ -370,6 +381,15 @@ class OrderSerializer(serializers.ModelSerializer):
             "decline_reason",
             "refund_needed",
 
+            # WEIGH-IN
+            "unit_price",
+            "estimated_weight",
+            "estimated_total_price",
+            "price_status",
+            "weighed_at",
+            "price_accepted_at",
+            "weigh_in_tolerance",
+
             # TIMELINE
             "created_at",
             "confirmed_at",
@@ -392,6 +412,12 @@ class OrderSerializer(serializers.ModelSerializer):
             "mpesa_transaction_code",
             "decline_reason",
             "refund_needed",
+            "unit_price",
+            "estimated_weight",
+            "estimated_total_price",
+            "price_status",
+            "weighed_at",
+            "price_accepted_at",
             "created_at",
             "confirmed_at",
             "washing_at",
@@ -411,26 +437,17 @@ class OrderSerializer(serializers.ModelSerializer):
         return value
 
     # ===========================
-    # VALIDATE SERVICE BELONGS TO SHOP
-    # ===========================
-    def validate(self, data):
-
-        shop = data.get("shop")
-        service = data.get("service")
-
-        if shop and service:
-            if service.shop != shop:
-                raise serializers.ValidationError(
-                    "Selected service does not belong to this shop"
-                )
-
-        return data
-
-    # ===========================
-    # VALIDATE — weight vs quantity depends on the chosen service
+    # VALIDATE — the service must belong to the shop, and weight vs
+    # quantity depends on how the chosen service is priced
     # ===========================
     def validate(self, attrs):
+        shop = attrs.get("shop")
         service = attrs.get("service")
+
+        if shop and service and service.shop_id != shop.pk:
+            raise serializers.ValidationError(
+                "Selected service does not belong to this shop"
+            )
 
         if service:
             if service.pricing_type == "per_item":
@@ -456,11 +473,21 @@ class OrderSerializer(serializers.ModelSerializer):
         pickup_lat = validated_data.get("pickup_lat")
         pickup_lng = validated_data.get("pickup_lng")
 
+        service = validated_data["service"]
+        weight = validated_data.get("weight")
+
+        # Per-kg orders are booked with an ESTIMATE: the shop weighs the laundry at pickup and the
+        # customer can't pay until the final price is known (see services/weigh_in.py).
+        # Per-item orders are exact from the start.
+        is_per_kg = service.pricing_type == "per_kg"
+
         order = Order.objects.create(
             user=user,
             shop=validated_data["shop"],
-            service=validated_data["service"],
-            weight=validated_data.get("weight"),
+            service=service,
+            weight=weight,
+            estimated_weight=weight if is_per_kg else None,
+            price_status="estimate" if is_per_kg else "final",
             quantity=validated_data.get("quantity"),
             customer_notes=validated_data.get("customer_notes", ""),
             customer_phone=validated_data.get("customer_phone", ""),
@@ -537,4 +564,3 @@ class NotificationSerializer(serializers.ModelSerializer):
 
         read_only_fields = fields
 
-        

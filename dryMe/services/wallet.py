@@ -7,14 +7,24 @@ Invariants this module enforces:
   so  wallet.balance == sum(ledger)  always holds (see ledger_total()).
 - The payout fee is computed server-side and snapshotted on the Payout row.
 - One open payout per owner (also enforced by a partial unique index).
-- All mutations are atomic and row-locked (wallet / order / payout).
+- All mutations are atomic and row-locked. Lock order is always
+  wallet -> order/payout, so concurrent operations cannot deadlock.
+- Payout amounts are whole shillings (integers) only.
+
+Payout fees (Safaricom B2C) — two ways to configure, both server-side:
+  1. Flat per method (default):  settings.PAYOUT_FEES = {"mpesa": Decimal("10"), "bank": Decimal("50")}
+  2. Tiered per method (optional): settings.PAYOUT_FEE_TIERS =
+         {"mpesa": [(Decimal("100"), Decimal("5")), (Decimal("1000"), Decimal("10")), (None, Decimal("25"))]}
+     Each tuple is (inclusive upper bound, fee), ascending. `None` as the bound means "no upper limit".
+     Take the real figures from your Daraja B2C tariff sheet. A method with no tiers falls back to
+     the flat PAYOUT_FEES value.
 """
 import logging
 import re
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from django.conf import settings
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Sum
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
@@ -38,9 +48,26 @@ def _money(value):
 
 
 def get_locked_wallet(owner):
-    """Get-or-create the owner's wallet, then lock the row. Call inside atomic()."""
-    wallet, _ = Wallet.objects.get_or_create(owner=owner)
-    return Wallet.objects.select_for_update().get(pk=wallet.pk)
+    """
+    Return the owner's wallet row, locked FOR UPDATE, creating it on first use.
+    Call inside transaction.atomic().
+
+    Race-safe: if two requests create the wallet at the same instant, the unique
+    constraint on `owner` makes one INSERT fail; that one rolls back only its own
+    savepoint and then locks the row the winner created.
+    """
+    try:
+        return Wallet.objects.select_for_update().get(owner=owner)
+    except Wallet.DoesNotExist:
+        pass
+
+    try:
+        with transaction.atomic():  # savepoint, so a lost race doesn't poison the outer transaction
+            Wallet.objects.create(owner=owner)
+    except IntegrityError:
+        pass  # someone else created it first — fine
+
+    return Wallet.objects.select_for_update().get(owner=owner)
 
 
 def _apply(wallet, tx_type, amount, *, order=None, payout=None, note=""):
@@ -124,6 +151,7 @@ def normalize_msisdn(raw):
 
 
 def _parse_amount(raw):
+    """Whole shillings only. Returns a Decimal with no fractional part."""
     try:
         value = Decimal(str(raw).strip())
     except (InvalidOperation, ValueError):
@@ -138,7 +166,17 @@ def _parse_amount(raw):
 
 
 def get_payout_fee(amount, method):
-    """Single place to change if the fee ever becomes tiered by amount."""
+    """
+    Server-side fee for withdrawing `amount` by `method`.
+    Uses settings.PAYOUT_FEE_TIERS[method] when configured, otherwise the flat
+    settings.PAYOUT_FEES[method]. The client never supplies a fee.
+    """
+    tiers = getattr(settings, "PAYOUT_FEE_TIERS", {}).get(method)
+    if tiers:
+        for upper_bound, fee in tiers:
+            if upper_bound is None or amount <= Decimal(upper_bound):
+                return _money(fee)
+        return _money(tiers[-1][1])  # amount above every bound: use the top tier
     return _money(settings.PAYOUT_FEES[method])
 
 
@@ -200,7 +238,7 @@ def request_payout(owner, amount, method, destination):
 
 
 # ===============================
-# 🛠️ PAYOUT: ADMIN TRANSITIONS (called from Django admin actions in Step 3)
+# 🛠️ PAYOUT: ADMIN TRANSITIONS (called from Django admin actions)
 # ===============================
 def _locked_payout(payout_id):
     return Payout.objects.select_for_update().get(pk=payout_id)
@@ -247,11 +285,19 @@ def _reverse_payout(payout_id, admin_user, reason, final_status):
     reason = (reason or "").strip()
     if not reason:
         raise ValidationError("A reason is required.")
+
+    # Unlocked peek at the owner so we can take the wallet lock FIRST — the same
+    # order request_payout() uses (wallet -> payout). Status is re-checked under lock below.
+    try:
+        owner = Payout.objects.select_related("owner").get(pk=payout_id).owner
+    except Payout.DoesNotExist:
+        raise ValidationError("Payout not found.") from None
+
     with transaction.atomic():
+        wallet = get_locked_wallet(owner)
         payout = _locked_payout(payout_id)
         if payout.status not in OPEN_STATUSES:
             raise ValidationError("This payout is already finalised.")
-        wallet = get_locked_wallet(payout.owner)
         # Nothing was sent, so the FULL gross amount (fee included) goes back.
         _apply(wallet, "payout_reversal", payout.amount, payout=payout, note=f"Withdrawal #{payout.pk} {final_status}")
         payout.status = final_status
@@ -269,3 +315,4 @@ def reject_payout(payout_id, admin_user, reason):
 def fail_payout(payout_id, admin_user, reason):
     """The transfer was attempted but didn't go through."""
     return _reverse_payout(payout_id, admin_user, reason, "failed")
+

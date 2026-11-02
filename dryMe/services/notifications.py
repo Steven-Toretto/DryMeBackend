@@ -77,3 +77,30 @@ def payout_message(kind, payout, reason=""):
 
 def credit_message(order, earnings):
     return f"Order #{order.pk:05d} completed — {kes(earnings)} added to your wallet."
+
+
+def kg(value):
+    """4.50 -> "4.5 kg", 10.00 -> "10 kg" (Decimal's own formatting would keep the trailing zero)."""
+    return f"{format(Decimal(value).normalize(), 'f')} kg"
+
+
+def weighed_message(order, within_margin):
+    """Customer: the shop weighed the laundry. Say whether they can pay or must approve first."""
+    shop = order.shop.name
+    weight = kg(order.weight)
+    if within_margin:
+        return f"{shop} weighed your laundry: {weight}. Final price {kes(order.total_price)} — you can pay now."
+    return (
+        f"{shop} weighed your laundry at {weight}. The price is now {kes(order.total_price)}, "
+        f"up from your {kes(order.estimated_total_price)} estimate. Accept it to pay, or cancel the order."
+    )
+
+
+def price_accepted_message(order):
+    """Owner: the customer accepted the higher final price."""
+    return (
+        f"{order.user.username} accepted the final price of {kes(order.total_price)} "
+        f"for order #{order.pk:05d}. Start washing once they've paid."
+    )
+
+

@@ -36,6 +36,7 @@ from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import authentication_classes
 from .services.payments import process_stk_callback
+from .services.weigh_in import payment_block_reason, washing_block_reason
 
 from .services.wallet import settle_order
 logger = logging.getLogger(__name__)
@@ -475,6 +476,15 @@ class MpesaSTKPushView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Per-kg orders can only be paid once the shop has weighed the laundry (and, if the price
+        # went up by more than the margin, the customer has accepted it).
+        blocked = payment_block_reason(order)
+        if blocked:
+            return Response(
+                {"error": blocked},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         phone = request.user.phone
         if not phone:
             return Response(
@@ -529,6 +539,12 @@ class MpesaSTKPushView(APIView):
                 )
 
             with transaction.atomic():
+                current = Order.objects.select_for_update().get(pk=order.pk)
+                if current.payable_amount() != amount or payment_block_reason(current):
+                    logger.error(
+                        "PRICE CHANGED while an STK prompt was in flight order=%s prompted=%s now=%s checkout=%s",
+                        order.pk, amount, current.payable_amount(), checkout_id,
+                    )
                 PaymentAttempt.objects.create(
                     order=order,
                     checkout_request_id=checkout_id,
@@ -889,6 +905,14 @@ class UpdateOrderStatusView(
             if new_status not in ["pending", "confirmed", "washing", "completed"]:
                 return Response(
                     {"error": "Invalid status"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Weigh-in orders: no washing until the final price is settled and paid.
+            blocked = washing_block_reason(order, new_status)
+            if blocked:
+                return Response(
+                    {"error": blocked},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
@@ -1401,3 +1425,5 @@ class MarkAllNotificationsReadView(APIView):
         ).update(is_read=True)
 
         return Response({"message": "All notifications marked as read"})
+
+

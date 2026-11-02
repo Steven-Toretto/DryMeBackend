@@ -196,6 +196,59 @@ class Order(models.Model):
         null=True,
     )
 
+    # 💲 The service rate (per kg / per item) agreed when the order was placed. Later changes
+    # to the shop's price list never touch an existing order.
+    unit_price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        blank=True,
+        null=True,
+    )
+
+    # ⚖️ Weigh-in (per-kg orders booked through the app).
+    # The customer books with an ESTIMATE. The shop weighs the laundry at pickup and enters the real
+    # weight; `weight` and `total_price` then hold the weighed figures, and the booked estimate stays
+    # here for comparison.
+    #   estimate        awaiting weigh-in            -> customer can't pay yet
+    #   needs_approval  weighed, over the margin     -> customer must accept (or cancel) first
+    #   final           payable                      -> per-item orders, weighed orders within the margin,
+    #                                                   and every order that existed before weigh-ins
+    PRICE_STATUS_CHOICES = (
+        ("estimate", "Estimate — awaiting weigh-in"),
+        ("needs_approval", "Weighed — customer must approve the new price"),
+        ("final", "Final"),
+    )
+
+    estimated_weight = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        blank=True,
+        null=True,
+    )
+
+    estimated_total_price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        blank=True,
+        null=True,
+    )
+
+    price_status = models.CharField(
+        max_length=20,
+        choices=PRICE_STATUS_CHOICES,
+        default="final",
+    )
+
+    weighed_at = models.DateTimeField(
+        blank=True,
+        null=True,
+    )
+
+    price_accepted_at = models.DateTimeField(
+        blank=True,
+        null=True,
+    )
+
     # 📝 Customer notes (gate code, stain alerts, instructions)
     customer_notes = models.TextField(
         blank=True,
@@ -309,26 +362,54 @@ class Order(models.Model):
     class Meta:
         ordering = ["-created_at"]
 
+    def compute_total(self):
+        """
+        Rate x weight (or x quantity), rounded to cents; None if it can't be priced yet.
+        Uses the rate agreed at booking (unit_price), falling back to the service's current
+        rate for orders that predate it.
+        """
+        if not self.service:
+            return None
+
+        rate = self.unit_price if self.unit_price is not None else self.service.price
+
+        if self.service.pricing_type == "per_item" and self.quantity:
+            raw = Decimal(rate) * Decimal(self.quantity)
+        elif self.service.pricing_type == "per_kg" and self.weight:
+            raw = Decimal(rate) * Decimal(self.weight)
+        else:
+            return None
+
+        return raw.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    @property
+    def is_weigh_in_order(self):
+        """True for per-kg orders booked with an estimate (the weigh-in flow applies to them)."""
+        return self.estimated_weight is not None
+
     def save(self, *args, **kwargs):
 
-        # ✅ Always recalculate total price — how depends on how this
-        # service is priced.
-        if self.service:
-            if self.service.pricing_type == "per_item" and self.quantity:
-                self.total_price = (
-                    Decimal(self.service.price)
-                    * Decimal(self.quantity)
-                )
-            elif self.service.pricing_type == "per_kg" and self.weight:
-                self.total_price = (
-                    Decimal(self.service.price)
-                    * Decimal(self.weight)
-                )
+        is_new = self.pk is None
+
+        # ✅ Price the order ONCE — when it's created (or if it was never priced). Later saves must not
+        # re-price it: shops can change their rates at any time, and the total a customer agreed to
+        # must not move with them. The only legitimate re-price is a weigh-in, which calls
+        # compute_total() explicitly.
+        if is_new and self.unit_price is None and self.service:
+            self.unit_price = self.service.price
+
+        if is_new or self.total_price is None:
+            total = self.compute_total()
+            if total is not None:
+                self.total_price = total
+
+        # Keep the booked estimate for per-kg orders, to compare the weigh-in against.
+        if is_new and self.estimated_weight is not None and self.estimated_total_price is None:
+            self.estimated_total_price = self.total_price
 
         # ✅ Snapshot customer details on creation — only fills in from
         # the profile as a fallback; an explicitly provided per-order
         # phone/location (from the booking form) always wins.
-        is_new = self.pk is None
         if is_new and self.user:
             if not self.customer_phone:
                 self.customer_phone = self.user.phone
@@ -418,6 +499,9 @@ class Notification(models.Model):
         ("payout_paid", "Withdrawal Paid"),
         ("payout_rejected", "Withdrawal Rejected"),
         ("payout_failed", "Withdrawal Failed"),
+        ("order_weighed", "Laundry Weighed"),
+        ("price_approval", "Price Approval Needed"),
+        ("price_accepted", "Price Accepted"),
     )
     
     notif_type = models.CharField(
@@ -625,4 +709,6 @@ class PaymentAttempt(models.Model):
 
     def __str__(self):
         return f"{self.checkout_request_id} — KES {self.amount} ({self.status})"
+
+
 
