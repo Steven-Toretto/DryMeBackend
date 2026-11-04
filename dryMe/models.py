@@ -286,6 +286,19 @@ class Order(models.Model):
         null=True,
     )
 
+    # 🕒 When the shop will collect: a day plus a two-hour window (Nairobi time). Optional, so orders
+    # booked before pickup windows existed, or by an older app, stay valid. See services/pickup.py.
+    pickup_date = models.DateField(
+        blank=True,
+        null=True,
+    )
+
+    pickup_slot = models.CharField(
+        max_length=5,
+        blank=True,
+        default="",
+    )
+
     # 💳 Payment status
     PAYMENT_STATUS_CHOICES = (
         ("unpaid", "Unpaid"),
@@ -709,6 +722,3 @@ class PaymentAttempt(models.Model):
 
     def __str__(self):
         return f"{self.checkout_request_id} — KES {self.amount} ({self.status})"
-
-
-

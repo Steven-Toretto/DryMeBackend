@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Avg
 
 from .models import Shop, Service, Order, Review, Notification
+from .services import pickup
 from .services.weigh_in import tolerance
 
 User = get_user_model()
@@ -265,6 +266,20 @@ class OrderSerializer(serializers.ModelSerializer):
     )
 
     # ===========================
+    # PICKUP WINDOW — both or neither; checked against the server's own clock in validate()
+    # ===========================
+    pickup_date = serializers.DateField(required=False, allow_null=True)
+    pickup_slot = serializers.ChoiceField(
+        choices=pickup.SLOT_CHOICES,
+        required=False,
+        allow_blank=True,
+    )
+    pickup_slot_label = serializers.SerializerMethodField()
+
+    def get_pickup_slot_label(self, obj):
+        return pickup.slot_label(obj.pickup_slot) if obj.pickup_slot in pickup.SLOT_KEYS else ""
+
+    # ===========================
     # SNAPSHOT FIELDS — writable so the customer can confirm/override
     # per order at checkout, instead of silently relying on whatever
     # (if anything) is saved on their profile.
@@ -369,6 +384,11 @@ class OrderSerializer(serializers.ModelSerializer):
             "pickup_lat",
             "pickup_lng",
 
+            # PICKUP WINDOW
+            "pickup_date",
+            "pickup_slot",
+            "pickup_slot_label",
+
             # ARCHIVE
             "customer_archived",
             "owner_archived",
@@ -449,6 +469,18 @@ class OrderSerializer(serializers.ModelSerializer):
                 "Selected service does not belong to this shop"
             )
 
+        pickup_date = attrs.get("pickup_date")
+        pickup_slot = attrs.get("pickup_slot") or ""
+        if pickup_date or pickup_slot:
+            if not (pickup_date and pickup_slot):
+                raise serializers.ValidationError({
+                    "pickup_slot": "Choose both a day and a time window.",
+                })
+            try:
+                pickup.check_slot(pickup_date, pickup_slot)
+            except pickup.PickupError as exc:
+                raise serializers.ValidationError({"pickup_slot": str(exc)})
+
         if service:
             if service.pricing_type == "per_item":
                 if not attrs.get("quantity"):
@@ -489,6 +521,8 @@ class OrderSerializer(serializers.ModelSerializer):
             estimated_weight=weight if is_per_kg else None,
             price_status="estimate" if is_per_kg else "final",
             quantity=validated_data.get("quantity"),
+            pickup_date=validated_data.get("pickup_date"),
+            pickup_slot=validated_data.get("pickup_slot") or "",
             customer_notes=validated_data.get("customer_notes", ""),
             customer_phone=validated_data.get("customer_phone", ""),
             customer_location=validated_data.get("customer_location", ""),
@@ -563,4 +597,3 @@ class NotificationSerializer(serializers.ModelSerializer):
         )
 
         read_only_fields = fields
-

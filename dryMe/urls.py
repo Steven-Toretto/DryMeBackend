@@ -38,6 +38,7 @@ from .wallet_views import (
 
 from .stats_views import OwnerStatsView
 from .weigh_in_views import AcceptPriceView, WeighOrderView
+from .pickup_views import PickupSlotsView
 
 
 urlpatterns = [
@@ -60,6 +61,9 @@ urlpatterns = [
     # 🧺 SERVICES
     path('services/', ServiceListCreateView.as_view()),
     path('services/<int:pk>/', ServiceDetailView.as_view()),
+
+    # 🕒 PICKUP WINDOWS (public): which days and two-hour windows can be booked right now
+    path('pickup-slots/', PickupSlotsView.as_view()),
 
     # 📦 CUSTOMER ORDERS
     path('orders/', OrderListCreateView.as_view()),
@@ -123,4 +127,3 @@ if settings.DEBUG:
         settings.MEDIA_URL,
         document_root=settings.MEDIA_ROOT
     )
-
